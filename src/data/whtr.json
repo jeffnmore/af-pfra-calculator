@@ -1,0 +1,18 @@
+{
+  "thresholds": [
+    { "max": 0.49, "points": 20},
+    { "max": 0.50, "points": 19},
+    { "max": 0.51, "points": 18},
+    { "max": 0.52, "points": 17},
+    { "max": 0.53, "points": 16},
+    { "max": 0.54, "points": 15},
+    { "max": 0.55, "points": 12.5},
+    { "max": 0.56, "points": 10},
+    { "max": 0.57, "points": 7.5},
+    { "max": 0.58, "points": 5},
+    { "max": 0.59, "points": 2.5},
+    { "max": 0.60, "points": 0}
+    
+  ],
+  "fail": { "min": 0.60, "points": 0 }
+}
