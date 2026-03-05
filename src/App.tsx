@@ -207,11 +207,7 @@ const AFSPEC_STRENGTH_CORE: Array<{
 ];
 
 // Cardio points (50.0 down to 35.0) — 2-mile must be <= max time; HAMR must be >= min shuttles
-const AFSPEC_CARDIO: Array<{
-  pts: number;
-  runMax: string; // mm:ss
-  hamrMin: number; // shuttles
-}> = [
+const AFSPEC_CARDIO: Array<{ pts: number; runMax: string; hamrMin: number }> = [
   { pts: 50.0, runMax: "13:25", hamrMin: 87 },
   { pts: 49.5, runMax: "13:44", hamrMin: 84 },
   { pts: 49.0, runMax: "14:03", hamrMin: 81 },
@@ -272,36 +268,17 @@ function lookupAFSPECHamrPoints(shuttles: number): number {
 }
 
 export default function App() {
-  // ===== Branding/Meta =====
   const APP_VERSION = "1.0.0";
   const APP_UPDATED = "2026-03-04";
 
-  // ===== Attachments (public/attachments) =====
   const ATTACHMENTS = [
-    {
-      title: "Warfighter’s Fitness Playbook",
-      subtitle: "2.0 • Feb 2026",
-      url: "/attachments/Playbook.pdf",
-      filename: "Playbook.pdf",
-    },
-    {
-      title: "PFRA Scoring Charts",
-      subtitle: "Includes AFSPECWAR/EOD page",
-      url: "/attachments/PFRA_Scoring_Charts.pdf",
-      filename: "PFRA_Scoring_Charts.pdf",
-    },
-    {
-      title: "DAFMAN 36-2905 IC",
-      subtitle: "22 Jan 2026",
-      url: "/attachments/DAFMAN.pdf",
-      filename: "DAFMAN.pdf",
-    },
+    { title: "Warfighter’s Fitness Playbook", subtitle: "2.0 • Feb 2026", url: "/attachments/Playbook.pdf", filename: "Playbook.pdf" },
+    { title: "PFRA Scoring Charts", subtitle: "Includes AFSPECWAR/EOD page", url: "/attachments/PFRA_Scoring_Charts.pdf", filename: "PFRA_Scoring_Charts.pdf" },
+    { title: "DAFMAN 36-2905 IC", subtitle: "22 Jan 2026", url: "/attachments/DAFMAN.pdf", filename: "DAFMAN.pdf" },
   ] as const;
 
-  // ----- Program selection -----
   const [program, setProgram] = useState<TestProgram>("PFRA");
 
-  // ----- Inputs -----
   const [age, setAge] = useState("");
   const [gender, setGender] = useState<Gender>("M");
 
@@ -322,20 +299,18 @@ export default function App() {
   const [height, setHeight] = useState("");
   const [waist, setWaist] = useState("");
 
-  // ----- Exemptions -----
   const [exemptWHtR, setExemptWHtR] = useState(false);
   const [exemptStrength, setExemptStrength] = useState(false);
   const [exemptCore, setExemptCore] = useState(false);
   const [exemptCardio, setExemptCardio] = useState(false);
 
-  // ----- Toast -----
   const [toast, setToast] = useState<{ message: string; kind: "ok" | "err" } | null>(null);
   function showToast(message: string, kind: "ok" | "err" = "ok") {
     setToast({ message, kind });
     window.setTimeout(() => setToast(null), 2600);
   }
 
-  // ----- Responsive (updates on resize) -----
+  // Responsive
   const [vw, setVw] = useState<number>(() => (typeof window !== "undefined" ? window.innerWidth : 1200));
   useEffect(() => {
     const onResize = () => setVw(window.innerWidth);
@@ -346,7 +321,13 @@ export default function App() {
   const isNarrow = vw < 980;
   const isVeryNarrow = vw < 680;
 
-  // ----- Derived -----
+  // Mobile Mode toggle (defaults ON for small screens)
+  const [mobileMode, setMobileMode] = useState<boolean>(() => (typeof window !== "undefined" ? window.innerWidth < 680 : false));
+  useEffect(() => {
+    // auto-enable on tiny screens; allow user to turn it off
+    if (vw < 680) setMobileMode(true);
+  }, [vw]);
+
   const ageBand = useMemo(() => {
     const a = parseNumber(age);
     return a == null ? "Under 25" : getAgeBand(a);
@@ -441,7 +422,7 @@ export default function App() {
     return sh == null ? 0 : lookupAFSPECHamrPoints(sh);
   }, [exemptCardio, isAFSPEC, cardioTest, run2MileTime, hamrShuttles, ageBand, gender]);
 
-  // ----- Exemption-aware totals (ALWAYS PRORATED) -----
+  // ALWAYS PRORATED
   const maxWHtR = 20;
   const maxStrength = 15;
   const maxCore = 15;
@@ -452,10 +433,7 @@ export default function App() {
   const earnedCore = corePoints;
   const earnedCardio = cardioPoints;
 
-  const earnedTotal = useMemo(
-    () => earnedWHtR + earnedStrength + earnedCore + earnedCardio,
-    [earnedWHtR, earnedStrength, earnedCore, earnedCardio]
-  );
+  const earnedTotal = useMemo(() => earnedWHtR + earnedStrength + earnedCore + earnedCardio, [earnedWHtR, earnedStrength, earnedCore, earnedCardio]);
 
   const availableMax = useMemo(() => {
     let m = 0;
@@ -466,15 +444,12 @@ export default function App() {
     return m;
   }, [exemptWHtR, exemptStrength, exemptCore, exemptCardio]);
 
-  const total = useMemo(() => {
-    if (availableMax <= 0) return 0;
-    return (earnedTotal / availableMax) * 100;
-  }, [earnedTotal, availableMax]);
+  const total = useMemo(() => (availableMax <= 0 ? 0 : (earnedTotal / availableMax) * 100), [earnedTotal, availableMax]);
 
   const badge = scoreColor(total);
   const showDiagnostic = isDiagnosticWindow();
 
-  // ----- Visual System (more compact) -----
+  // Visual System
   const pageBg = "#041A3A";
   const panelBg = "rgba(8, 18, 38, 0.76)";
   const panelBorder = "1px solid rgba(255,255,255,0.12)";
@@ -482,10 +457,14 @@ export default function App() {
   const faintText = "rgba(255,255,255,0.62)";
   const accent = "#6EC1FF";
 
+  const pad = mobileMode ? 10 : 12;
+  const inputPad = mobileMode ? "10px 11px" : "11px 12px";
+  const inputFont = mobileMode ? 14 : 14.5;
+
   const cardStyle: React.CSSProperties = {
     background: panelBg,
     borderRadius: 12,
-    padding: 12, // smaller
+    padding: pad,
     border: panelBorder,
     boxShadow: "0 10px 26px rgba(0,0,0,0.22)",
     backdropFilter: "blur(6px)",
@@ -493,7 +472,7 @@ export default function App() {
 
   const sectionTitleStyle: React.CSSProperties = {
     fontWeight: 950,
-    marginBottom: 8, // smaller
+    marginBottom: mobileMode ? 8 : 10,
     color: "#FFFFFF",
     letterSpacing: 0.25,
     display: "flex",
@@ -516,7 +495,7 @@ export default function App() {
   };
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: 850,
     marginBottom: 6,
     color: subtleText,
@@ -524,11 +503,11 @@ export default function App() {
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
-    padding: "9px 11px", // smaller
+    padding: inputPad,
     borderRadius: 10,
     border: "1px solid rgba(255,255,255,0.20)",
     outline: "none",
-    fontSize: 13.5,
+    fontSize: inputFont,
     background: "rgba(255,255,255,0.06)",
     color: "#FFFFFF",
   };
@@ -537,29 +516,30 @@ export default function App() {
 
   const kpiCardStyle: React.CSSProperties = {
     ...cardStyle,
-    padding: 10,
+    padding: mobileMode ? 10 : 11,
     display: "flex",
     flexDirection: "column",
-    gap: 5,
-    minHeight: 74,
+    gap: 6,
+    minHeight: mobileMode ? 72 : 78,
   };
 
   const kpiValueStyle: React.CSSProperties = {
-    fontSize: 24,
+    fontSize: mobileMode ? 24 : 26,
     fontWeight: 950,
     lineHeight: 1,
     letterSpacing: 0.2,
   };
 
   const kpiLabelStyle: React.CSSProperties = {
-    fontSize: 11,
+    fontSize: 11.5,
     color: faintText,
     fontWeight: 850,
     letterSpacing: 0.6,
   };
 
-  const gridCols = isVeryNarrow ? "1fr" : isNarrow ? "1fr 1fr" : "1.05fr 1fr 1fr";
-  const kpiCols = isVeryNarrow ? "1fr 1fr" : "repeat(4, 1fr)";
+  // Force truly mobile-friendly layout when mobileMode is on
+  const gridCols = mobileMode ? "1fr" : isVeryNarrow ? "1fr" : isNarrow ? "1fr 1fr" : "1.05fr 1fr 1fr";
+  const kpiCols = mobileMode ? "1fr 1fr" : isVeryNarrow ? "1fr 1fr" : "repeat(4, 1fr)";
 
   const disabledCard = (disabled: boolean): React.CSSProperties =>
     disabled
@@ -568,6 +548,11 @@ export default function App() {
           filter: "grayscale(0.15)",
         }
       : {};
+
+  const [showBreakdown, setShowBreakdown] = useState<boolean>(() => !isVeryNarrow);
+  useEffect(() => {
+    if (mobileMode) setShowBreakdown(false);
+  }, [mobileMode]);
 
   return (
     <div
@@ -586,7 +571,7 @@ export default function App() {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 9px 11px;
+            padding: 10px 12px;
             border-radius: 12px;
             border: 1px solid rgba(255,255,255,0.14);
             background: rgba(255,255,255,0.06);
@@ -596,6 +581,7 @@ export default function App() {
             cursor: pointer;
             text-decoration: none;
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
           }
           .af-btn:hover { background: rgba(255,255,255,0.10); }
           .af-btn:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -606,6 +592,12 @@ export default function App() {
             font-size: 12px;
             font-weight: 900;
             letter-spacing: 0.15px;
+          }
+
+          .af-btn--pill {
+            padding: 8px 10px;
+            border-radius: 999px;
+            font-size: 12px;
           }
 
           /* dropdown option visibility (Windows/Edge) */
@@ -624,7 +616,7 @@ export default function App() {
         `}
       </style>
 
-      <div style={{ width: "100%", maxWidth: 1080, padding: 14 }}>
+      <div style={{ width: "100%", maxWidth: mobileMode ? 920 : 1080, padding: mobileMode ? 12 : 14 }}>
         {/* Accent stripe */}
         <div
           style={{
@@ -635,168 +627,136 @@ export default function App() {
           }}
         />
 
-        {/* Sticky Score Bar (locks WHtR/Strength/Core/Cardio/Total on top) */}
+        {/* Top Command Bar (NOT STICKY) */}
         <div
           style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 2000,
-            paddingTop: 6,
-            paddingBottom: 10,
-            background: `linear-gradient(180deg, rgba(4,26,58,0.98) 0%, rgba(4,26,58,0.78) 55%, rgba(4,26,58,0.00) 100%)`,
-            backdropFilter: "blur(8px)",
+            display: "flex",
+            flexDirection: isVeryNarrow ? "column" : "row",
+            alignItems: isVeryNarrow ? "stretch" : "center",
+            justifyContent: "space-between",
+            gap: 10,
+            padding: "10px 12px",
+            borderRadius: 14,
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(0, 0, 0, 0.18)",
+            boxShadow: "0 10px 22px rgba(0,0,0,0.25)",
           }}
         >
-          {/* Top Command Bar (compact) */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: isVeryNarrow ? "column" : "row",
-              alignItems: isVeryNarrow ? "stretch" : "center",
-              justifyContent: "space-between",
-              gap: 10,
-              padding: "10px 12px",
-              borderRadius: 14,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(0, 0, 0, 0.18)",
-              boxShadow: "0 10px 22px rgba(0,0,0,0.25)",
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <div style={{ fontSize: 11.5, fontWeight: 900, letterSpacing: 1.15, color: "rgba(255,255,255,0.72)" }}>
-                USAF FITNESS
-              </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 900, letterSpacing: 1.15, color: "rgba(255,255,255,0.72)" }}>USAF FITNESS</div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
-                <div style={{ fontSize: 16.5, fontWeight: 950, letterSpacing: 0.3 }}>PFRA Scoring Dashboard</div>
-                <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.60)" }}>
-                  v{APP_VERSION} · Updated {APP_UPDATED}
-                </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
+              <div style={{ fontSize: 16.5, fontWeight: 950, letterSpacing: 0.3 }}>PFRA Scoring Dashboard</div>
+              <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.60)" }}>
+                v{APP_VERSION} · Updated {APP_UPDATED}
               </div>
+            </div>
 
-              <div style={{ fontSize: 11.5, color: faintText }}>WHtR 20 + Strength 15 + Core 15 + Cardio 50 = 100</div>
+            <div style={{ fontSize: 11.5, color: faintText }}>WHtR 20 + Strength 15 + Core 15 + Cardio 50 = 100</div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button className="af-btn af-btn--pill" type="button" onClick={() => setMobileMode((v) => !v)} title="Toggle mobile-friendly layout">
+              {mobileMode ? "Mobile Mode: ON" : "Mobile Mode: OFF"}
+            </button>
+
+            <div
+              style={{
+                ...cardStyle,
+                padding: "9px 11px",
+                minWidth: isVeryNarrow ? "100%" : 250,
+                textAlign: "center",
+                border: "1px solid rgba(255,255,255,0.12)",
+              }}
+            >
+              <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>TEST PROGRAM</div>
+              <div style={{ marginTop: 7 }}>
+                <select className="af-select" value={program} onChange={(e) => setProgram(e.target.value as TestProgram)} style={selectStyle}>
+                  <option value="PFRA">PFRA (Standard)</option>
+                  <option value="AFSPECWAR_EOD">AFSPECWAR / EOD</option>
+                </select>
+              </div>
+              <div style={{ marginTop: 7, fontSize: 10.5, color: "rgba(255,255,255,0.62)" }}>
+                {isAFSPEC ? "Universal AFSPECWAR/EOD chart (all ages/genders)" : "Age/gender-based PFRA charts"}
+              </div>
             </div>
 
             <div
               style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "stretch",
-                flexWrap: "wrap",
-                justifyContent: isVeryNarrow ? "flex-start" : "flex-end",
+                background: "rgba(0,0,0,0.22)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 14,
+                padding: "9px 11px",
+                minWidth: isVeryNarrow ? "100%" : 180,
+                textAlign: "center",
+                boxShadow: "0 10px 22px rgba(0,0,0,0.25)",
               }}
             >
-              <div
-                style={{
-                  ...cardStyle,
-                  padding: "9px 11px",
-                  minWidth: isVeryNarrow ? "100%" : 250,
-                  textAlign: "center",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                }}
-              >
-                <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>TEST PROGRAM</div>
-                <div style={{ marginTop: 7 }}>
-                  <select
-                    className="af-select"
-                    value={program}
-                    onChange={(e) => setProgram(e.target.value as TestProgram)}
-                    style={{ ...selectStyle, padding: "9px 11px" }}
-                  >
-                    <option value="PFRA">PFRA (Standard)</option>
-                    <option value="AFSPECWAR_EOD">AFSPECWAR / EOD</option>
-                  </select>
-                </div>
-                <div style={{ marginTop: 7, fontSize: 10.5, color: "rgba(255,255,255,0.62)" }}>
-                  {isAFSPEC ? "Universal AFSPECWAR/EOD chart (all ages/genders)" : "Age/gender-based PFRA charts"}
-                </div>
+              <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>TOTAL</div>
+              <div style={{ fontSize: 34, fontWeight: 950, lineHeight: 1.05, marginTop: 4 }}>{total.toFixed(1)}</div>
+              <div style={{ marginTop: 6, fontSize: 10.5, color: "rgba(255,255,255,0.62)" }}>
+                Prorated · Available max <strong style={{ color: "#fff" }}>{availableMax.toFixed(0)}</strong>
               </div>
+            </div>
 
-              <div
-                style={{
-                  ...cardStyle,
-                  padding: "9px 11px",
-                  minWidth: isVeryNarrow ? "100%" : 230,
-                  textAlign: "center",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                }}
-              >
-                <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>STATUS</div>
-                <div style={{ marginTop: 6, display: "flex", justifyContent: "center" }}>
-                  <div
-                    style={{
-                      background: badge.bg,
-                      color: badge.fg,
-                      borderRadius: 999,
-                      padding: "6px 10px",
-                      fontSize: 11.5,
-                      fontWeight: 950,
-                      letterSpacing: 0.2,
-                      boxShadow: "0 8px 18px rgba(0,0,0,0.25)",
-                    }}
-                  >
-                    {badge.label}
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  background: "rgba(0,0,0,0.22)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: 14,
-                  padding: "9px 11px",
-                  minWidth: isVeryNarrow ? "100%" : 180,
-                  textAlign: "center",
-                  boxShadow: "0 10px 22px rgba(0,0,0,0.25)",
-                }}
-              >
-                <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>TOTAL</div>
-                <div style={{ fontSize: 34, fontWeight: 950, lineHeight: 1.05, marginTop: 4 }}>{total.toFixed(1)}</div>
-                <div style={{ marginTop: 6, fontSize: 10.5, color: "rgba(255,255,255,0.62)" }}>
-                  Prorated · Available max <strong style={{ color: "#fff" }}>{availableMax.toFixed(0)}</strong>
+            <div
+              style={{
+                ...cardStyle,
+                padding: "9px 11px",
+                minWidth: isVeryNarrow ? "100%" : 210,
+                textAlign: "center",
+                border: "1px solid rgba(255,255,255,0.12)",
+              }}
+            >
+              <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>STATUS</div>
+              <div style={{ marginTop: 6, display: "flex", justifyContent: "center" }}>
+                <div
+                  style={{
+                    background: badge.bg,
+                    color: badge.fg,
+                    borderRadius: 999,
+                    padding: "6px 10px",
+                    fontSize: 11.5,
+                    fontWeight: 950,
+                    letterSpacing: 0.2,
+                    boxShadow: "0 8px 18px rgba(0,0,0,0.25)",
+                  }}
+                >
+                  {badge.label}
                 </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* KPI Row (sticky) */}
-          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: kpiCols, gap: 8 }}>
-            <div style={kpiCardStyle}>
-              <div style={kpiLabelStyle}>WHtR</div>
-              <div style={kpiValueStyle}>{earnedWHtR.toFixed(1)}</div>
-              <div style={{ fontSize: 11, color: faintText }}>
-                {exemptWHtR ? "Exempt" : whtrData.rounded == null ? "—" : `Rounded ${whtrData.rounded.toFixed(2)}`}
-              </div>
+        {/* KPI Row (NOT STICKY) */}
+        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: kpiCols, gap: 8 }}>
+          <div style={kpiCardStyle}>
+            <div style={kpiLabelStyle}>WHtR</div>
+            <div style={kpiValueStyle}>{earnedWHtR.toFixed(1)}</div>
+            <div style={{ fontSize: 11, color: faintText }}>
+              {exemptWHtR ? "Exempt" : whtrData.rounded == null ? "—" : `Rounded ${whtrData.rounded.toFixed(2)}`}
             </div>
+          </div>
 
-            <div style={kpiCardStyle}>
-              <div style={kpiLabelStyle}>STRENGTH</div>
-              <div style={kpiValueStyle}>{earnedStrength.toFixed(1)}</div>
-              <div style={{ fontSize: 11, color: faintText }}>
-                {exemptStrength ? "Exempt" : strengthTest === "pushups" ? "Push-ups" : "HRPU"}
-              </div>
-            </div>
+          <div style={kpiCardStyle}>
+            <div style={kpiLabelStyle}>STRENGTH</div>
+            <div style={kpiValueStyle}>{earnedStrength.toFixed(1)}</div>
+            <div style={{ fontSize: 11, color: faintText }}>{exemptStrength ? "Exempt" : strengthTest === "pushups" ? "Push-ups" : "HRPU"}</div>
+          </div>
 
-            <div style={kpiCardStyle}>
-              <div style={kpiLabelStyle}>CORE</div>
-              <div style={kpiValueStyle}>{earnedCore.toFixed(1)}</div>
-              <div style={{ fontSize: 11, color: faintText }}>
-                {exemptCore
-                  ? "Exempt"
-                  : coreTest === "situps"
-                  ? "Sit-ups"
-                  : coreTest === "reverse_crunch"
-                  ? "Reverse crunch"
-                  : "Plank"}
-              </div>
+          <div style={kpiCardStyle}>
+            <div style={kpiLabelStyle}>CORE</div>
+            <div style={kpiValueStyle}>{earnedCore.toFixed(1)}</div>
+            <div style={{ fontSize: 11, color: faintText }}>
+              {exemptCore ? "Exempt" : coreTest === "situps" ? "Sit-ups" : coreTest === "reverse_crunch" ? "Reverse crunch" : "Plank"}
             </div>
+          </div>
 
-            <div style={kpiCardStyle}>
-              <div style={kpiLabelStyle}>CARDIO</div>
-              <div style={kpiValueStyle}>{earnedCardio.toFixed(1)}</div>
-              <div style={{ fontSize: 11, color: faintText }}>{exemptCardio ? "Exempt" : cardioTest === "2mile" ? "2-mile run" : "HAMR"}</div>
-            </div>
+          <div style={kpiCardStyle}>
+            <div style={kpiLabelStyle}>CARDIO</div>
+            <div style={kpiValueStyle}>{earnedCardio.toFixed(1)}</div>
+            <div style={{ fontSize: 11, color: faintText }}>{exemptCardio ? "Exempt" : cardioTest === "2mile" ? "2-mile run" : "HAMR"}</div>
           </div>
         </div>
 
@@ -834,15 +794,14 @@ export default function App() {
                 <span style={{ color: "#FFF" }}>AFSPECWAR/EOD universal chart</span>
               ) : (
                 <>
-                  Band: <span style={{ color: "#FFF" }}>{ageBand}</span> ·{" "}
-                  <span style={{ color: "#FFF" }}>{gender === "M" ? "Male" : "Female"}</span>
+                  Band: <span style={{ color: "#FFF" }}>{ageBand}</span> · <span style={{ color: "#FFF" }}>{gender === "M" ? "Male" : "Female"}</span>
                 </>
               )}
             </div>
           </div>
         )}
 
-        {/* Exemptions (no prorate toggle; ALWAYS prorated) */}
+        {/* Exemptions (ALWAYS PRORATED; no toggle) */}
         <div style={{ marginTop: 10, ...cardStyle }}>
           <div style={sectionTitleStyle}>
             <span>Exemptions</span>
@@ -887,15 +846,7 @@ export default function App() {
         <div style={{ marginTop: 12, height: 1, background: "rgba(255,255,255,0.10)" }} />
 
         {/* Main Grid */}
-        <div
-          style={{
-            marginTop: 10,
-            display: "grid",
-            gridTemplateColumns: gridCols,
-            gap: 10,
-            alignItems: "stretch",
-          }}
-        >
+        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: gridCols, gap: 10, alignItems: "stretch" }}>
           {/* Column 1: Profile + WHtR */}
           <div style={{ display: "grid", gap: 10 }}>
             <div style={cardStyle}>
@@ -904,7 +855,7 @@ export default function App() {
                 <span style={sectionTagStyle}>Inputs</span>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: isVeryNarrow ? "1fr" : "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: mobileMode || isVeryNarrow ? "1fr" : "1fr 1fr", gap: 10 }}>
                 <div>
                   <div style={labelStyle}>Exact Age</div>
                   <input value={age} onChange={(e) => setAge(e.target.value)} inputMode="numeric" placeholder="e.g., 27" style={inputStyle} />
@@ -938,7 +889,7 @@ export default function App() {
                 <span style={sectionTagStyle}>Body Comp</span>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: isVeryNarrow ? "1fr" : "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: mobileMode || isVeryNarrow ? "1fr" : "1fr 1fr", gap: 10 }}>
                 <div>
                   <div style={labelStyle}>Height</div>
                   <input
@@ -963,7 +914,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: isVeryNarrow ? "1fr" : "1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : isVeryNarrow ? "1fr" : "1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
                 <div style={{ fontSize: 11.5, color: faintText }}>
                   Raw: <strong style={{ color: "#FFF" }}>{exemptWHtR ? "—" : whtrData.raw == null ? "—" : whtrData.raw.toFixed(4)}</strong>
                 </div>
@@ -990,26 +941,28 @@ export default function App() {
                 <span style={sectionTagStyle}>Muscular</span>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.3fr 1fr", gap: 10 }}>
                 <div>
                   <div style={labelStyle}>Test</div>
-                  <select
-                    className="af-select"
-                    value={strengthTest}
-                    onChange={(e) => setStrengthTest(e.target.value as StrengthTest)}
-                    style={selectStyle}
-                    disabled={exemptStrength}
-                  >
+                  <select className="af-select" value={strengthTest} onChange={(e) => setStrengthTest(e.target.value as StrengthTest)} style={selectStyle} disabled={exemptStrength}>
                     <option value="pushups">Push-ups</option>
                     <option value="hrpu">Hand-release push-ups</option>
                   </select>
                 </div>
 
-                <div>
-                  <div style={labelStyle}>Points</div>
-                  <div style={{ fontSize: 24, fontWeight: 950, paddingTop: 4 }}>{earnedStrength.toFixed(1)}</div>
-                </div>
+                {!mobileMode && (
+                  <div>
+                    <div style={labelStyle}>Points</div>
+                    <div style={{ fontSize: 24, fontWeight: 950, paddingTop: 4 }}>{earnedStrength.toFixed(1)}</div>
+                  </div>
+                )}
               </div>
+
+              {mobileMode && (
+                <div style={{ marginTop: 8, fontSize: 12, color: faintText }}>
+                  Points: <strong style={{ color: "#FFF" }}>{earnedStrength.toFixed(1)}</strong>
+                </div>
+              )}
 
               <div style={{ marginTop: 10 }}>
                 <div style={labelStyle}>{strengthTest === "pushups" ? "Push-ups (reps)" : "HRPU (reps)"}</div>
@@ -1021,11 +974,6 @@ export default function App() {
                   style={inputStyle}
                   disabled={exemptStrength}
                 />
-                {isAFSPEC && (
-                  <div style={{ marginTop: 8, fontSize: 10.5, color: "rgba(255,255,255,0.62)" }}>
-                    AFSPECWAR/EOD: universal points scale (15.0 → 2.5).
-                  </div>
-                )}
               </div>
             </div>
 
@@ -1035,27 +983,29 @@ export default function App() {
                 <span style={sectionTagStyle}>Stability</span>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.3fr 1fr", gap: 10 }}>
                 <div>
                   <div style={labelStyle}>Test</div>
-                  <select
-                    className="af-select"
-                    value={coreTest}
-                    onChange={(e) => setCoreTest(e.target.value as CoreTest)}
-                    style={selectStyle}
-                    disabled={exemptCore}
-                  >
+                  <select className="af-select" value={coreTest} onChange={(e) => setCoreTest(e.target.value as CoreTest)} style={selectStyle} disabled={exemptCore}>
                     <option value="situps">Sit-ups</option>
                     <option value="reverse_crunch">Cross-leg reverse crunch</option>
                     <option value="plank">Forearm plank (mm:ss)</option>
                   </select>
                 </div>
 
-                <div>
-                  <div style={labelStyle}>Points</div>
-                  <div style={{ fontSize: 24, fontWeight: 950, paddingTop: 4 }}>{earnedCore.toFixed(1)}</div>
-                </div>
+                {!mobileMode && (
+                  <div>
+                    <div style={labelStyle}>Points</div>
+                    <div style={{ fontSize: 24, fontWeight: 950, paddingTop: 4 }}>{earnedCore.toFixed(1)}</div>
+                  </div>
+                )}
               </div>
+
+              {mobileMode && (
+                <div style={{ marginTop: 8, fontSize: 12, color: faintText }}>
+                  Points: <strong style={{ color: "#FFF" }}>{earnedCore.toFixed(1)}</strong>
+                </div>
+              )}
 
               <div style={{ marginTop: 10 }}>
                 <div style={labelStyle}>
@@ -1064,22 +1014,13 @@ export default function App() {
                 <input
                   value={coreTest === "situps" ? situpReps : coreTest === "reverse_crunch" ? reverseCrunchReps : plankTime}
                   onChange={(e) =>
-                    coreTest === "situps"
-                      ? setSitupReps(e.target.value)
-                      : coreTest === "reverse_crunch"
-                      ? setReverseCrunchReps(e.target.value)
-                      : setPlankTime(e.target.value)
+                    coreTest === "situps" ? setSitupReps(e.target.value) : coreTest === "reverse_crunch" ? setReverseCrunchReps(e.target.value) : setPlankTime(e.target.value)
                   }
                   inputMode={coreTest === "plank" ? "text" : "numeric"}
                   placeholder={coreTest === "plank" ? "e.g., 2:30" : "e.g., 45"}
                   style={inputStyle}
                   disabled={exemptCore}
                 />
-                {isAFSPEC && coreTest === "plank" && (
-                  <div style={{ marginTop: 8, fontSize: 10.5, color: "rgba(255,255,255,0.62)" }}>
-                    AFSPECWAR/EOD plank uses the universal thresholds (min time for points).
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -1092,26 +1033,28 @@ export default function App() {
                 <span style={sectionTagStyle}>Aerobic</span>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.3fr 1fr", gap: 10 }}>
                 <div>
                   <div style={labelStyle}>Test</div>
-                  <select
-                    className="af-select"
-                    value={cardioTest}
-                    onChange={(e) => setCardioTest(e.target.value as CardioTest)}
-                    style={selectStyle}
-                    disabled={exemptCardio}
-                  >
+                  <select className="af-select" value={cardioTest} onChange={(e) => setCardioTest(e.target.value as CardioTest)} style={selectStyle} disabled={exemptCardio}>
                     <option value="2mile">2-mile run (mm:ss)</option>
                     <option value="hamr">20m HAMR (shuttles)</option>
                   </select>
                 </div>
 
-                <div>
-                  <div style={labelStyle}>Points</div>
-                  <div style={{ fontSize: 24, fontWeight: 950, paddingTop: 4 }}>{earnedCardio.toFixed(1)}</div>
-                </div>
+                {!mobileMode && (
+                  <div>
+                    <div style={labelStyle}>Points</div>
+                    <div style={{ fontSize: 24, fontWeight: 950, paddingTop: 4 }}>{earnedCardio.toFixed(1)}</div>
+                  </div>
+                )}
               </div>
+
+              {mobileMode && (
+                <div style={{ marginTop: 8, fontSize: 12, color: faintText }}>
+                  Points: <strong style={{ color: "#FFF" }}>{earnedCardio.toFixed(1)}</strong>
+                </div>
+              )}
 
               <div style={{ marginTop: 10 }}>
                 <div style={labelStyle}>{cardioTest === "2mile" ? "2-mile time (mm:ss)" : "HAMR shuttles (count)"}</div>
@@ -1123,55 +1066,62 @@ export default function App() {
                   style={inputStyle}
                   disabled={exemptCardio}
                 />
-                {isAFSPEC && (
-                  <div style={{ marginTop: 8, fontSize: 10.5, color: "rgba(255,255,255,0.62)" }}>
-                    AFSPECWAR/EOD cardio uses the universal points scale (50.0 → 35.0).
-                  </div>
-                )}
               </div>
             </div>
 
+            {/* Breakdown (collapsible on Mobile Mode) */}
             <div style={cardStyle}>
               <div style={sectionTitleStyle}>
                 <span>Breakdown</span>
-                <span style={sectionTagStyle}>Summary</span>
-              </div>
-
-              <div style={{ display: "grid", gap: 7 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
-                  <span>WHtR</span>
-                  <strong style={{ color: "#FFF" }}>{earnedWHtR.toFixed(1)}</strong>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
-                  <span>Strength</span>
-                  <strong style={{ color: "#FFF" }}>{earnedStrength.toFixed(1)}</strong>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
-                  <span>Core</span>
-                  <strong style={{ color: "#FFF" }}>{earnedCore.toFixed(1)}</strong>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
-                  <span>Cardio</span>
-                  <strong style={{ color: "#FFF" }}>{earnedCardio.toFixed(1)}</strong>
-                </div>
-
-                <div
-                  style={{
-                    borderTop: "1px solid rgba(255,255,255,0.10)",
-                    marginTop: 6,
-                    paddingTop: 10,
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span style={{ fontWeight: 950 }}>Total</span>
-                  <span style={{ fontWeight: 950, fontSize: 17 }}>{total.toFixed(1)}</span>
-                </div>
-
-                <div style={{ fontSize: 10.5, color: faintText, marginTop: 6 }}>
-                  Tip: Use <strong style={{ color: "#FFF" }}>Tab</strong> to move between fields quickly.
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  {mobileMode && (
+                    <button className="af-btn af-btn--pill" type="button" onClick={() => setShowBreakdown((v) => !v)}>
+                      {showBreakdown ? "Hide" : "Show"}
+                    </button>
+                  )}
+                  <span style={sectionTagStyle}>Summary</span>
                 </div>
               </div>
+
+              {!mobileMode || showBreakdown ? (
+                <div style={{ display: "grid", gap: 7 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
+                    <span>WHtR</span>
+                    <strong style={{ color: "#FFF" }}>{earnedWHtR.toFixed(1)}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
+                    <span>Strength</span>
+                    <strong style={{ color: "#FFF" }}>{earnedStrength.toFixed(1)}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
+                    <span>Core</span>
+                    <strong style={{ color: "#FFF" }}>{earnedCore.toFixed(1)}</strong>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
+                    <span>Cardio</span>
+                    <strong style={{ color: "#FFF" }}>{earnedCardio.toFixed(1)}</strong>
+                  </div>
+
+                  <div
+                    style={{
+                      borderTop: "1px solid rgba(255,255,255,0.10)",
+                      marginTop: 6,
+                      paddingTop: 10,
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span style={{ fontWeight: 950 }}>Total</span>
+                    <span style={{ fontWeight: 950, fontSize: 17 }}>{total.toFixed(1)}</span>
+                  </div>
+
+                  <div style={{ fontSize: 10.5, color: faintText, marginTop: 6 }}>
+                    Tip: Use <strong style={{ color: "#FFF" }}>Tab</strong> to move between fields quickly.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 11.5, color: faintText }}>Tap “Show” to view component totals.</div>
+              )}
             </div>
           </div>
         </div>
@@ -1179,15 +1129,7 @@ export default function App() {
         {/* Downloads */}
         <div style={{ marginTop: 14, height: 1, background: "rgba(255,255,255,0.10)" }} />
 
-        <div
-          style={{
-            ...cardStyle,
-            marginTop: 10,
-            padding: 12,
-            background: "rgba(8, 18, 38, 0.62)",
-            border: "1px solid rgba(255,255,255,0.10)",
-          }}
-        >
+        <div style={{ ...cardStyle, marginTop: 10, padding: 12, background: "rgba(8, 18, 38, 0.62)", border: "1px solid rgba(255,255,255,0.10)" }}>
           <div style={{ ...sectionTitleStyle, marginBottom: 10, fontSize: 13.5 }}>
             <span>Downloads</span>
             <span style={{ ...sectionTagStyle, fontSize: 10, padding: "3px 8px" }}>PDF</span>
@@ -1223,23 +1165,12 @@ export default function App() {
         {/* Footer */}
         <div style={{ marginTop: 14, height: 1, background: "rgba(255,255,255,0.10)" }} />
 
-        <div
-          style={{
-            marginTop: 10,
-            paddingTop: 10,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 14,
-          }}
-        >
+        <div style={{ marginTop: 10, paddingTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
           <img src="/branding/usaf_wings_transparent_refined.png" alt="USAF Wings" style={{ height: 32, width: "auto", opacity: 0.95 }} />
           <img src="/branding/us_air_force_text_transparent.png" alt="U.S. Air Force" style={{ height: 15, width: "auto", opacity: 0.9 }} />
         </div>
 
-        <div style={{ textAlign: "center", marginTop: 6, fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
-          PFRA Calculator • Powered by Fingers
-        </div>
+        <div style={{ textAlign: "center", marginTop: 6, fontSize: 11, color: "rgba(255,255,255,0.55)" }}>PFRA Calculator • Powered by Fingers</div>
 
         <div style={{ textAlign: "center", marginTop: 6, fontSize: 10.8, color: "rgba(255,255,255,0.60)", lineHeight: 1.35 }}>
           Always verify scoring, exemptions, and program requirements against current official guidance and local unit policy
