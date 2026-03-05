@@ -299,7 +299,7 @@ export default function App() {
   const [height, setHeight] = useState("");
   const [waist, setWaist] = useState("");
 
-  // Exemptions are still selectable, but score is ALWAYS prorated.
+  // Exemptions are selectable; score is ALWAYS prorated.
   const [exemptWHtR, setExemptWHtR] = useState(false);
   const [exemptStrength, setExemptStrength] = useState(false);
   const [exemptCore, setExemptCore] = useState(false);
@@ -468,6 +468,52 @@ export default function App() {
   const badge = scoreColor(total);
   const showDiagnostic = isDiagnosticWindow();
 
+  // --- Tiny mobile top score ticker (appears on scroll + input) ---
+  const [scrollY, setScrollY] = useState(0);
+  useEffect(() => {
+    const onScroll = () => setScrollY(window.scrollY || 0);
+    window.addEventListener("scroll", onScroll, { passive: true } as any);
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll as any);
+  }, []);
+
+  const hasAnyInput = useMemo(() => {
+    return (
+      age.trim() !== "" ||
+      height.trim() !== "" ||
+      waist.trim() !== "" ||
+      pushupReps.trim() !== "" ||
+      hrpuReps.trim() !== "" ||
+      situpReps.trim() !== "" ||
+      reverseCrunchReps.trim() !== "" ||
+      plankTime.trim() !== "" ||
+      run2MileTime.trim() !== "" ||
+      hamrShuttles.trim() !== "" ||
+      exemptWHtR ||
+      exemptStrength ||
+      exemptCore ||
+      exemptCardio
+    );
+  }, [
+    age,
+    height,
+    waist,
+    pushupReps,
+    hrpuReps,
+    situpReps,
+    reverseCrunchReps,
+    plankTime,
+    run2MileTime,
+    hamrShuttles,
+    exemptWHtR,
+    exemptStrength,
+    exemptCore,
+    exemptCardio,
+  ]);
+
+  const showMobileTicker = mobileMode && hasAnyInput && scrollY > 120;
+  const tickerH = 44;
+
   // Visual System
   const pageBg = "#041A3A";
   const panelBg = "rgba(8, 18, 38, 0.76)";
@@ -635,7 +681,83 @@ export default function App() {
         `}
       </style>
 
-      <div style={{ width: "100%", maxWidth: mobileMode ? 920 : 1080, padding: mobileMode ? 12 : 14 }}>
+      {/* Mobile Top Score Ticker (fixed, tiny, non-blocking) */}
+      {showMobileTicker && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: tickerH,
+            zIndex: 9998,
+            display: "flex",
+            justifyContent: "center",
+            pointerEvents: "none",
+            background: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(10px)",
+            borderBottom: "1px solid rgba(255,255,255,0.12)",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: mobileMode ? 920 : 1080,
+              padding: "6px 12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              color: "rgba(255,255,255,0.92)",
+              fontWeight: 900,
+              letterSpacing: 0.2,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.72)", fontWeight: 900 }}>TOTAL</div>
+              <div style={{ fontSize: 18, fontWeight: 950, lineHeight: 1 }}>{total.toFixed(1)}</div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                fontSize: 11.5,
+                color: "rgba(255,255,255,0.88)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span style={{ color: "rgba(255,255,255,0.70)" }}>W</span>
+              <span>{earnedWHtR.toFixed(1)}</span>
+
+              <span style={{ opacity: 0.35 }}>•</span>
+
+              <span style={{ color: "rgba(255,255,255,0.70)" }}>S</span>
+              <span>{earnedStrength.toFixed(1)}</span>
+
+              <span style={{ opacity: 0.35 }}>•</span>
+
+              <span style={{ color: "rgba(255,255,255,0.70)" }}>C</span>
+              <span>{earnedCore.toFixed(1)}</span>
+
+              <span style={{ opacity: 0.35 }}>•</span>
+
+              <span style={{ color: "rgba(255,255,255,0.70)" }}>A</span>
+              <span>{earnedCardio.toFixed(1)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div
+        style={{
+          width: "100%",
+          maxWidth: mobileMode ? 920 : 1080,
+          padding: mobileMode ? 12 : 14,
+          paddingTop: (mobileMode ? 12 : 14) + (showMobileTicker ? tickerH + 8 : 0),
+        }}
+      >
         {/* Accent stripe */}
         <div
           style={{
@@ -697,12 +819,7 @@ export default function App() {
             >
               <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>TEST PROGRAM</div>
               <div style={{ marginTop: 7 }}>
-                <select
-                  className="af-select"
-                  value={program}
-                  onChange={(e) => setProgram(e.target.value as TestProgram)}
-                  style={selectStyle}
-                >
+                <select className="af-select" value={program} onChange={(e) => setProgram(e.target.value as TestProgram)} style={selectStyle}>
                   <option value="PFRA">PFRA (Standard)</option>
                   <option value="AFSPECWAR_EOD">AFSPECWAR / EOD</option>
                 </select>
@@ -918,7 +1035,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Section separator */}
         <div style={{ marginTop: 12, height: 1, background: "rgba(255,255,255,0.10)" }} />
 
         {/* Main Grid */}
