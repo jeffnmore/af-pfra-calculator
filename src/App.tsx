@@ -325,7 +325,6 @@ export default function App() {
   // Mobile Mode toggle (defaults ON for small screens)
   const [mobileMode, setMobileMode] = useState<boolean>(() => (typeof window !== "undefined" ? window.innerWidth < 680 : false));
   useEffect(() => {
-    // auto-enable on tiny screens; allow user to turn it off
     if (vw < 680) setMobileMode(true);
   }, [vw]);
 
@@ -340,7 +339,7 @@ export default function App() {
   function scrollToRef(ref: React.RefObject<HTMLDivElement>) {
     const el = ref.current;
     if (!el) return;
-    const y = el.getBoundingClientRect().top + window.scrollY - 10;
+    const y = el.getBoundingClientRect().top + (window.pageYOffset || window.scrollY || 0) - 10;
     window.scrollTo({ top: y, behavior: "smooth" });
   }
 
@@ -468,13 +467,26 @@ export default function App() {
   const badge = scoreColor(total);
   const showDiagnostic = isDiagnosticWindow();
 
-  // --- Tiny mobile top score ticker (appears on scroll + input) ---
+  // --- Robust Mobile Ticker (appears on scroll + input; non-blocking) ---
   const [scrollY, setScrollY] = useState(0);
+
   useEffect(() => {
-    const onScroll = () => setScrollY(window.scrollY || 0);
-    window.addEventListener("scroll", onScroll, { passive: true } as any);
+    const getScrollY = () => {
+      const se = document.scrollingElement || document.documentElement;
+      return window.pageYOffset || se.scrollTop || 0;
+    };
+
+    const onScroll = () => setScrollY(getScrollY());
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    document.addEventListener("scroll", onScroll, { passive: true, capture: true });
+
     onScroll();
-    return () => window.removeEventListener("scroll", onScroll as any);
+
+    return () => {
+      window.removeEventListener("scroll", onScroll as any);
+      document.removeEventListener("scroll", onScroll as any, true as any);
+    };
   }, []);
 
   const hasAnyInput = useMemo(() => {
@@ -511,7 +523,8 @@ export default function App() {
     exemptCardio,
   ]);
 
-  const showMobileTicker = mobileMode && hasAnyInput && scrollY > 120;
+  const isPhone = vw < 820;
+  const showMobileTicker = (mobileMode || isPhone) && hasAnyInput && scrollY > 20;
   const tickerH = 44;
 
   // Visual System
@@ -524,7 +537,7 @@ export default function App() {
 
   const pad = mobileMode ? 10 : 12;
   const inputPad = mobileMode ? "10px 11px" : "11px 12px";
-  const inputFont = mobileMode ? 14 : 14.5;
+  const inputFont = 14;
 
   const cardStyle: React.CSSProperties = {
     background: panelBg,
@@ -602,7 +615,6 @@ export default function App() {
     letterSpacing: 0.6,
   };
 
-  // Force truly mobile-friendly layout when mobileMode is on
   const gridCols = mobileMode ? "1fr" : isVeryNarrow ? "1fr" : isNarrow ? "1fr 1fr" : "1.05fr 1fr 1fr";
   const kpiCols = mobileMode ? "1fr 1fr" : isVeryNarrow ? "1fr 1fr" : "repeat(4, 1fr)";
 
@@ -799,12 +811,7 @@ export default function App() {
           </div>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <button
-              className="af-btn af-btn--pill"
-              type="button"
-              onClick={() => setMobileMode((v) => !v)}
-              title="Toggle mobile-friendly layout"
-            >
+            <button className="af-btn af-btn--pill" type="button" onClick={() => setMobileMode((v) => !v)} title="Toggle mobile-friendly layout">
               {mobileMode ? "Mobile Mode: ON" : "Mobile Mode: OFF"}
             </button>
 
@@ -1294,7 +1301,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Breakdown (collapsible on Mobile Mode) */}
             <div style={cardStyle}>
               <div style={sectionTitleStyle}>
                 <span>Breakdown</span>
