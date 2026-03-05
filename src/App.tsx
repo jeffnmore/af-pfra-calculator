@@ -299,7 +299,7 @@ export default function App() {
   const [height, setHeight] = useState("");
   const [waist, setWaist] = useState("");
 
-  // Exemptions are selectable; score is ALWAYS prorated.
+  // Exemptions selectable; score ALWAYS prorated (no toggle).
   const [exemptWHtR, setExemptWHtR] = useState(false);
   const [exemptStrength, setExemptStrength] = useState(false);
   const [exemptCore, setExemptCore] = useState(false);
@@ -343,6 +343,7 @@ export default function App() {
     window.scrollTo({ top: y, behavior: "smooth" });
   }
 
+  // ----- Derived -----
   const ageBand = useMemo(() => {
     const a = parseNumber(age);
     return a == null ? "Under 25" : getAgeBand(a);
@@ -467,27 +468,10 @@ export default function App() {
   const badge = scoreColor(total);
   const showDiagnostic = isDiagnosticWindow();
 
-  // --- Robust Mobile Ticker (appears on scroll + input; non-blocking) ---
-  const [scrollY, setScrollY] = useState(0);
-
-  useEffect(() => {
-    const getScrollY = () => {
-      const se = document.scrollingElement || document.documentElement;
-      return window.pageYOffset || se.scrollTop || 0;
-    };
-
-    const onScroll = () => setScrollY(getScrollY());
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    document.addEventListener("scroll", onScroll, { passive: true, capture: true });
-
-    onScroll();
-
-    return () => {
-      window.removeEventListener("scroll", onScroll as any);
-      document.removeEventListener("scroll", onScroll as any, true as any);
-    };
-  }, []);
+  // ----- Mobile ticker: show when header scrolls out of view (IntersectionObserver; mobile-safe) -----
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const tickerSentinelRef = useRef<HTMLDivElement | null>(null);
+  const [showMobileTicker, setShowMobileTicker] = useState(false);
 
   const hasAnyInput = useMemo(() => {
     return (
@@ -524,10 +508,34 @@ export default function App() {
   ]);
 
   const isPhone = vw < 820;
-  const showMobileTicker = (mobileMode || isPhone) && hasAnyInput && scrollY > 20;
-  const tickerH = 44;
 
-  // Visual System
+  // Show ticker only after any interaction (typing or exemption selection)
+  const engaged = hasAnyInput;
+
+  useEffect(() => {
+    // Only care on phone-ish layouts
+    if (!(mobileMode || isPhone)) {
+      setShowMobileTicker(false);
+      return;
+    }
+
+    const sentinel = tickerSentinelRef.current;
+    if (!sentinel) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        const pastHeader = !e.isIntersecting; // sentinel has scrolled out of view
+        setShowMobileTicker(pastHeader && engaged);
+      },
+      { root: null, threshold: 0.01 }
+    );
+
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [mobileMode, isPhone, engaged]);
+
+  // ----- Visual System -----
   const pageBg = "#041A3A";
   const panelBg = "rgba(8, 18, 38, 0.76)";
   const panelBorder = "1px solid rgba(255,255,255,0.12)";
@@ -535,9 +543,10 @@ export default function App() {
   const faintText = "rgba(255,255,255,0.62)";
   const accent = "#6EC1FF";
 
+  const containerMaxWidth = mobileMode ? 920 : 1080;
+
   const pad = mobileMode ? 10 : 12;
   const inputPad = mobileMode ? "10px 11px" : "11px 12px";
-  const inputFont = 14;
 
   const cardStyle: React.CSSProperties = {
     background: panelBg,
@@ -585,7 +594,7 @@ export default function App() {
     borderRadius: 10,
     border: "1px solid rgba(255,255,255,0.20)",
     outline: "none",
-    fontSize: inputFont,
+    fontSize: 14,
     background: "rgba(255,255,255,0.06)",
     color: "#FFFFFF",
   };
@@ -630,6 +639,10 @@ export default function App() {
   useEffect(() => {
     if (mobileMode) setShowBreakdown(false);
   }, [mobileMode]);
+
+  // Ticker sizing: big enough to cover "USAF FITNESS / PFRA Scoring Dashboard"
+  const tickerHeight = 66;
+  const tickerOffsetTop = 8;
 
   return (
     <div
@@ -693,71 +706,73 @@ export default function App() {
         `}
       </style>
 
-      {/* Mobile Top Score Ticker (fixed, tiny, non-blocking) */}
+      {/* Mobile Score Ticker (appears after scrolling past header + any interaction) */}
       {showMobileTicker && (
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: tickerH,
+            top: tickerOffsetTop,
+            left: "50%",
+            transform: "translateX(-50%)",
             zIndex: 9998,
-            display: "flex",
-            justifyContent: "center",
-            pointerEvents: "none",
-            background: "rgba(0,0,0,0.55)",
+
+            // ONLY as wide as the dashboard container (not full screen)
+            width: `calc(min(100vw - 16px, ${containerMaxWidth}px))`,
+            height: tickerHeight,
+
+            borderRadius: 14,
+            background: "rgba(0,0,0,0.62)",
             backdropFilter: "blur(10px)",
-            borderBottom: "1px solid rgba(255,255,255,0.12)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            boxShadow: "0 10px 22px rgba(0,0,0,0.35)",
+
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 12px",
+            gap: 10,
+
+            // Does NOT block taps on inputs below
+            pointerEvents: "none",
           }}
         >
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 950, letterSpacing: 1.1, color: "rgba(255,255,255,0.75)" }}>
+              SCORES
+            </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "baseline", whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: 22, fontWeight: 950, lineHeight: 1 }}>{total.toFixed(1)}</div>
+              <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.72)", fontWeight: 900 }}>TOTAL</div>
+            </div>
+          </div>
+
           <div
             style={{
-              width: "100%",
-              maxWidth: mobileMode ? 920 : 1080,
-              padding: "6px 12px",
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
               gap: 10,
-              color: "rgba(255,255,255,0.92)",
+              fontSize: 12,
               fontWeight: 900,
-              letterSpacing: 0.2,
+              color: "rgba(255,255,255,0.88)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.72)", fontWeight: 900 }}>TOTAL</div>
-              <div style={{ fontSize: 18, fontWeight: 950, lineHeight: 1 }}>{total.toFixed(1)}</div>
-            </div>
+            <span style={{ color: "rgba(255,255,255,0.70)" }}>WHtR</span>
+            <span>{earnedWHtR.toFixed(1)}</span>
+            <span style={{ opacity: 0.35 }}>•</span>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                fontSize: 11.5,
-                color: "rgba(255,255,255,0.88)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <span style={{ color: "rgba(255,255,255,0.70)" }}>W</span>
-              <span>{earnedWHtR.toFixed(1)}</span>
+            <span style={{ color: "rgba(255,255,255,0.70)" }}>STR</span>
+            <span>{earnedStrength.toFixed(1)}</span>
+            <span style={{ opacity: 0.35 }}>•</span>
 
-              <span style={{ opacity: 0.35 }}>•</span>
+            <span style={{ color: "rgba(255,255,255,0.70)" }}>CORE</span>
+            <span>{earnedCore.toFixed(1)}</span>
+            <span style={{ opacity: 0.35 }}>•</span>
 
-              <span style={{ color: "rgba(255,255,255,0.70)" }}>S</span>
-              <span>{earnedStrength.toFixed(1)}</span>
-
-              <span style={{ opacity: 0.35 }}>•</span>
-
-              <span style={{ color: "rgba(255,255,255,0.70)" }}>C</span>
-              <span>{earnedCore.toFixed(1)}</span>
-
-              <span style={{ opacity: 0.35 }}>•</span>
-
-              <span style={{ color: "rgba(255,255,255,0.70)" }}>A</span>
-              <span>{earnedCardio.toFixed(1)}</span>
-            </div>
+            <span style={{ color: "rgba(255,255,255,0.70)" }}>CARD</span>
+            <span>{earnedCardio.toFixed(1)}</span>
           </div>
         </div>
       )}
@@ -765,9 +780,10 @@ export default function App() {
       <div
         style={{
           width: "100%",
-          maxWidth: mobileMode ? 920 : 1080,
+          maxWidth: containerMaxWidth,
           padding: mobileMode ? 12 : 14,
-          paddingTop: (mobileMode ? 12 : 14) + (showMobileTicker ? tickerH + 8 : 0),
+          // leave room so ticker doesn't cover the top after it appears
+          paddingTop: (mobileMode ? 12 : 14) + (showMobileTicker ? tickerOffsetTop + tickerHeight + 10 : 0),
         }}
       >
         {/* Accent stripe */}
@@ -782,6 +798,7 @@ export default function App() {
 
         {/* Top Command Bar (NOT STICKY) */}
         <div
+          ref={headerRef}
           style={{
             display: "flex",
             flexDirection: isVeryNarrow ? "column" : "row",
@@ -884,6 +901,9 @@ export default function App() {
           </div>
         </div>
 
+        {/* Sentinel: when this scrolls out of view, show ticker */}
+        <div ref={tickerSentinelRef} style={{ height: 1 }} />
+
         {/* KPI Row (NOT STICKY) */}
         <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: kpiCols, gap: 8 }}>
           <div style={kpiCardStyle}>
@@ -906,13 +926,7 @@ export default function App() {
             <div style={kpiLabelStyle}>CORE</div>
             <div style={kpiValueStyle}>{earnedCore.toFixed(1)}</div>
             <div style={{ fontSize: 11, color: faintText }}>
-              {exemptCore
-                ? "Exempt"
-                : coreTest === "situps"
-                ? "Sit-ups"
-                : coreTest === "reverse_crunch"
-                ? "Reverse crunch"
-                : "Plank"}
+              {exemptCore ? "Exempt" : coreTest === "situps" ? "Sit-ups" : coreTest === "reverse_crunch" ? "Reverse crunch" : "Plank"}
             </div>
           </div>
 
@@ -1046,7 +1060,7 @@ export default function App() {
 
         {/* Main Grid */}
         <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: gridCols, gap: 10, alignItems: "stretch" }}>
-          {/* Column 1: Profile + WHtR */}
+          {/* Column 1 */}
           <div style={{ display: "grid", gap: 10 }}>
             <div ref={profileRef} style={cardStyle}>
               <div style={sectionTitleStyle}>
@@ -1139,7 +1153,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Column 2: Strength + Core */}
+          {/* Column 2 */}
           <div style={{ display: "grid", gap: 10 }}>
             <div ref={strengthRef} style={{ ...cardStyle, ...disabledCard(exemptStrength) }}>
               <div style={sectionTitleStyle}>
@@ -1227,11 +1241,7 @@ export default function App() {
 
               <div style={{ marginTop: 10 }}>
                 <div style={labelStyle}>
-                  {coreTest === "situps"
-                    ? "Sit-ups (reps)"
-                    : coreTest === "reverse_crunch"
-                    ? "Reverse crunch (reps)"
-                    : "Plank (mm:ss)"}
+                  {coreTest === "situps" ? "Sit-ups (reps)" : coreTest === "reverse_crunch" ? "Reverse crunch (reps)" : "Plank (mm:ss)"}
                 </div>
                 <input
                   value={coreTest === "situps" ? situpReps : coreTest === "reverse_crunch" ? reverseCrunchReps : plankTime}
@@ -1251,7 +1261,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Column 3: Cardio + Breakdown */}
+          {/* Column 3 */}
           <div style={{ display: "grid", gap: 10 }}>
             <div ref={cardioRef} style={{ ...cardStyle, ...disabledCard(exemptCardio) }}>
               <div style={sectionTitleStyle}>
