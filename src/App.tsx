@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import pushups from "./data/strength_pushups.json";
 import hrpu from "./data/strength_hrpu.json";
@@ -299,6 +299,7 @@ export default function App() {
   const [height, setHeight] = useState("");
   const [waist, setWaist] = useState("");
 
+  // Exemptions are still selectable, but score is ALWAYS prorated.
   const [exemptWHtR, setExemptWHtR] = useState(false);
   const [exemptStrength, setExemptStrength] = useState(false);
   const [exemptCore, setExemptCore] = useState(false);
@@ -327,6 +328,21 @@ export default function App() {
     // auto-enable on tiny screens; allow user to turn it off
     if (vw < 680) setMobileMode(true);
   }, [vw]);
+
+  // ---- Section jump refs (mobile) ----
+  const profileRef = useRef<HTMLDivElement | null>(null);
+  const whtrRef = useRef<HTMLDivElement | null>(null);
+  const strengthRef = useRef<HTMLDivElement | null>(null);
+  const coreRef = useRef<HTMLDivElement | null>(null);
+  const cardioRef = useRef<HTMLDivElement | null>(null);
+  const downloadsRef = useRef<HTMLDivElement | null>(null);
+
+  function scrollToRef(ref: React.RefObject<HTMLDivElement>) {
+    const el = ref.current;
+    if (!el) return;
+    const y = el.getBoundingClientRect().top + window.scrollY - 10;
+    window.scrollTo({ top: y, behavior: "smooth" });
+  }
 
   const ageBand = useMemo(() => {
     const a = parseNumber(age);
@@ -433,7 +449,10 @@ export default function App() {
   const earnedCore = corePoints;
   const earnedCardio = cardioPoints;
 
-  const earnedTotal = useMemo(() => earnedWHtR + earnedStrength + earnedCore + earnedCardio, [earnedWHtR, earnedStrength, earnedCore, earnedCardio]);
+  const earnedTotal = useMemo(
+    () => earnedWHtR + earnedStrength + earnedCore + earnedCardio,
+    [earnedWHtR, earnedStrength, earnedCore, earnedCardio]
+  );
 
   const availableMax = useMemo(() => {
     let m = 0;
@@ -643,7 +662,9 @@ export default function App() {
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 900, letterSpacing: 1.15, color: "rgba(255,255,255,0.72)" }}>USAF FITNESS</div>
+            <div style={{ fontSize: 11.5, fontWeight: 900, letterSpacing: 1.15, color: "rgba(255,255,255,0.72)" }}>
+              USAF FITNESS
+            </div>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
               <div style={{ fontSize: 16.5, fontWeight: 950, letterSpacing: 0.3 }}>PFRA Scoring Dashboard</div>
@@ -656,7 +677,12 @@ export default function App() {
           </div>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <button className="af-btn af-btn--pill" type="button" onClick={() => setMobileMode((v) => !v)} title="Toggle mobile-friendly layout">
+            <button
+              className="af-btn af-btn--pill"
+              type="button"
+              onClick={() => setMobileMode((v) => !v)}
+              title="Toggle mobile-friendly layout"
+            >
               {mobileMode ? "Mobile Mode: ON" : "Mobile Mode: OFF"}
             </button>
 
@@ -671,7 +697,12 @@ export default function App() {
             >
               <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>TEST PROGRAM</div>
               <div style={{ marginTop: 7 }}>
-                <select className="af-select" value={program} onChange={(e) => setProgram(e.target.value as TestProgram)} style={selectStyle}>
+                <select
+                  className="af-select"
+                  value={program}
+                  onChange={(e) => setProgram(e.target.value as TestProgram)}
+                  style={selectStyle}
+                >
                   <option value="PFRA">PFRA (Standard)</option>
                   <option value="AFSPECWAR_EOD">AFSPECWAR / EOD</option>
                 </select>
@@ -742,23 +773,67 @@ export default function App() {
           <div style={kpiCardStyle}>
             <div style={kpiLabelStyle}>STRENGTH</div>
             <div style={kpiValueStyle}>{earnedStrength.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>{exemptStrength ? "Exempt" : strengthTest === "pushups" ? "Push-ups" : "HRPU"}</div>
+            <div style={{ fontSize: 11, color: faintText }}>
+              {exemptStrength ? "Exempt" : strengthTest === "pushups" ? "Push-ups" : "HRPU"}
+            </div>
           </div>
 
           <div style={kpiCardStyle}>
             <div style={kpiLabelStyle}>CORE</div>
             <div style={kpiValueStyle}>{earnedCore.toFixed(1)}</div>
             <div style={{ fontSize: 11, color: faintText }}>
-              {exemptCore ? "Exempt" : coreTest === "situps" ? "Sit-ups" : coreTest === "reverse_crunch" ? "Reverse crunch" : "Plank"}
+              {exemptCore
+                ? "Exempt"
+                : coreTest === "situps"
+                ? "Sit-ups"
+                : coreTest === "reverse_crunch"
+                ? "Reverse crunch"
+                : "Plank"}
             </div>
           </div>
 
           <div style={kpiCardStyle}>
             <div style={kpiLabelStyle}>CARDIO</div>
             <div style={kpiValueStyle}>{earnedCardio.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>{exemptCardio ? "Exempt" : cardioTest === "2mile" ? "2-mile run" : "HAMR"}</div>
+            <div style={{ fontSize: 11, color: faintText }}>
+              {exemptCardio ? "Exempt" : cardioTest === "2mile" ? "2-mile run" : "HAMR"}
+            </div>
           </div>
         </div>
+
+        {/* Mobile Jump Bar */}
+        {mobileMode && (
+          <div
+            style={{
+              marginTop: 10,
+              ...cardStyle,
+              padding: 10,
+              background: "rgba(0,0,0,0.18)",
+              border: "1px solid rgba(255,255,255,0.12)",
+            }}
+          >
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(profileRef)}>
+                Profile
+              </button>
+              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(whtrRef)}>
+                WHtR
+              </button>
+              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(strengthRef)}>
+                Strength
+              </button>
+              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(coreRef)}>
+                Core
+              </button>
+              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(cardioRef)}>
+                Cardio
+              </button>
+              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(downloadsRef)}>
+                Downloads
+              </button>
+            </div>
+          </div>
+        )}
 
         {showDiagnostic && (
           <div
@@ -794,7 +869,8 @@ export default function App() {
                 <span style={{ color: "#FFF" }}>AFSPECWAR/EOD universal chart</span>
               ) : (
                 <>
-                  Band: <span style={{ color: "#FFF" }}>{ageBand}</span> · <span style={{ color: "#FFF" }}>{gender === "M" ? "Male" : "Female"}</span>
+                  Band: <span style={{ color: "#FFF" }}>{ageBand}</span> ·{" "}
+                  <span style={{ color: "#FFF" }}>{gender === "M" ? "Male" : "Female"}</span>
                 </>
               )}
             </div>
@@ -849,7 +925,7 @@ export default function App() {
         <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: gridCols, gap: 10, alignItems: "stretch" }}>
           {/* Column 1: Profile + WHtR */}
           <div style={{ display: "grid", gap: 10 }}>
-            <div style={cardStyle}>
+            <div ref={profileRef} style={cardStyle}>
               <div style={sectionTitleStyle}>
                 <span>Profile</span>
                 <span style={sectionTagStyle}>Inputs</span>
@@ -883,7 +959,7 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ ...cardStyle, ...disabledCard(exemptWHtR) }}>
+            <div ref={whtrRef} style={{ ...cardStyle, ...disabledCard(exemptWHtR) }}>
               <div style={sectionTitleStyle}>
                 <span>WHtR (0–20)</span>
                 <span style={sectionTagStyle}>Body Comp</span>
@@ -914,7 +990,14 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : isVeryNarrow ? "1fr" : "1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: mobileMode ? "1fr" : isVeryNarrow ? "1fr" : "1fr 1fr 1fr",
+                  gap: 8,
+                  marginTop: 10,
+                }}
+              >
                 <div style={{ fontSize: 11.5, color: faintText }}>
                   Raw: <strong style={{ color: "#FFF" }}>{exemptWHtR ? "—" : whtrData.raw == null ? "—" : whtrData.raw.toFixed(4)}</strong>
                 </div>
@@ -935,7 +1018,7 @@ export default function App() {
 
           {/* Column 2: Strength + Core */}
           <div style={{ display: "grid", gap: 10 }}>
-            <div style={{ ...cardStyle, ...disabledCard(exemptStrength) }}>
+            <div ref={strengthRef} style={{ ...cardStyle, ...disabledCard(exemptStrength) }}>
               <div style={sectionTitleStyle}>
                 <span>Strength (0–15)</span>
                 <span style={sectionTagStyle}>Muscular</span>
@@ -944,7 +1027,13 @@ export default function App() {
               <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.3fr 1fr", gap: 10 }}>
                 <div>
                   <div style={labelStyle}>Test</div>
-                  <select className="af-select" value={strengthTest} onChange={(e) => setStrengthTest(e.target.value as StrengthTest)} style={selectStyle} disabled={exemptStrength}>
+                  <select
+                    className="af-select"
+                    value={strengthTest}
+                    onChange={(e) => setStrengthTest(e.target.value as StrengthTest)}
+                    style={selectStyle}
+                    disabled={exemptStrength}
+                  >
                     <option value="pushups">Push-ups</option>
                     <option value="hrpu">Hand-release push-ups</option>
                   </select>
@@ -977,7 +1066,7 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ ...cardStyle, ...disabledCard(exemptCore) }}>
+            <div ref={coreRef} style={{ ...cardStyle, ...disabledCard(exemptCore) }}>
               <div style={sectionTitleStyle}>
                 <span>Core (0–15)</span>
                 <span style={sectionTagStyle}>Stability</span>
@@ -986,7 +1075,13 @@ export default function App() {
               <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.3fr 1fr", gap: 10 }}>
                 <div>
                   <div style={labelStyle}>Test</div>
-                  <select className="af-select" value={coreTest} onChange={(e) => setCoreTest(e.target.value as CoreTest)} style={selectStyle} disabled={exemptCore}>
+                  <select
+                    className="af-select"
+                    value={coreTest}
+                    onChange={(e) => setCoreTest(e.target.value as CoreTest)}
+                    style={selectStyle}
+                    disabled={exemptCore}
+                  >
                     <option value="situps">Sit-ups</option>
                     <option value="reverse_crunch">Cross-leg reverse crunch</option>
                     <option value="plank">Forearm plank (mm:ss)</option>
@@ -1009,12 +1104,20 @@ export default function App() {
 
               <div style={{ marginTop: 10 }}>
                 <div style={labelStyle}>
-                  {coreTest === "situps" ? "Sit-ups (reps)" : coreTest === "reverse_crunch" ? "Reverse crunch (reps)" : "Plank (mm:ss)"}
+                  {coreTest === "situps"
+                    ? "Sit-ups (reps)"
+                    : coreTest === "reverse_crunch"
+                    ? "Reverse crunch (reps)"
+                    : "Plank (mm:ss)"}
                 </div>
                 <input
                   value={coreTest === "situps" ? situpReps : coreTest === "reverse_crunch" ? reverseCrunchReps : plankTime}
                   onChange={(e) =>
-                    coreTest === "situps" ? setSitupReps(e.target.value) : coreTest === "reverse_crunch" ? setReverseCrunchReps(e.target.value) : setPlankTime(e.target.value)
+                    coreTest === "situps"
+                      ? setSitupReps(e.target.value)
+                      : coreTest === "reverse_crunch"
+                      ? setReverseCrunchReps(e.target.value)
+                      : setPlankTime(e.target.value)
                   }
                   inputMode={coreTest === "plank" ? "text" : "numeric"}
                   placeholder={coreTest === "plank" ? "e.g., 2:30" : "e.g., 45"}
@@ -1027,7 +1130,7 @@ export default function App() {
 
           {/* Column 3: Cardio + Breakdown */}
           <div style={{ display: "grid", gap: 10 }}>
-            <div style={{ ...cardStyle, ...disabledCard(exemptCardio) }}>
+            <div ref={cardioRef} style={{ ...cardStyle, ...disabledCard(exemptCardio) }}>
               <div style={sectionTitleStyle}>
                 <span>Cardio (0–50)</span>
                 <span style={sectionTagStyle}>Aerobic</span>
@@ -1036,7 +1139,13 @@ export default function App() {
               <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.3fr 1fr", gap: 10 }}>
                 <div>
                   <div style={labelStyle}>Test</div>
-                  <select className="af-select" value={cardioTest} onChange={(e) => setCardioTest(e.target.value as CardioTest)} style={selectStyle} disabled={exemptCardio}>
+                  <select
+                    className="af-select"
+                    value={cardioTest}
+                    onChange={(e) => setCardioTest(e.target.value as CardioTest)}
+                    style={selectStyle}
+                    disabled={exemptCardio}
+                  >
                     <option value="2mile">2-mile run (mm:ss)</option>
                     <option value="hamr">20m HAMR (shuttles)</option>
                   </select>
@@ -1129,7 +1238,16 @@ export default function App() {
         {/* Downloads */}
         <div style={{ marginTop: 14, height: 1, background: "rgba(255,255,255,0.10)" }} />
 
-        <div style={{ ...cardStyle, marginTop: 10, padding: 12, background: "rgba(8, 18, 38, 0.62)", border: "1px solid rgba(255,255,255,0.10)" }}>
+        <div
+          ref={downloadsRef}
+          style={{
+            ...cardStyle,
+            marginTop: 10,
+            padding: 12,
+            background: "rgba(8, 18, 38, 0.62)",
+            border: "1px solid rgba(255,255,255,0.10)",
+          }}
+        >
           <div style={{ ...sectionTitleStyle, marginBottom: 10, fontSize: 13.5 }}>
             <span>Downloads</span>
             <span style={{ ...sectionTagStyle, fontSize: 10, padding: "3px 8px" }}>PDF</span>
@@ -1170,7 +1288,9 @@ export default function App() {
           <img src="/branding/us_air_force_text_transparent.png" alt="U.S. Air Force" style={{ height: 15, width: "auto", opacity: 0.9 }} />
         </div>
 
-        <div style={{ textAlign: "center", marginTop: 6, fontSize: 11, color: "rgba(255,255,255,0.55)" }}>PFRA Calculator • Powered by Fingers</div>
+        <div style={{ textAlign: "center", marginTop: 6, fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
+          PFRA Calculator • Powered by Fingers
+        </div>
 
         <div style={{ textAlign: "center", marginTop: 6, fontSize: 10.8, color: "rgba(255,255,255,0.60)", lineHeight: 1.35 }}>
           Always verify scoring, exemptions, and program requirements against current official guidance and local unit policy
