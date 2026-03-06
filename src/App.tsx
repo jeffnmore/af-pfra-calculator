@@ -268,7 +268,26 @@ function lookupAFSPECHamrPoints(shuttles: number): number {
 export default function App() {
   const APP_VERSION = "1.0.0";
   const APP_UPDATED = "2026-03-04";
+const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
 
+useEffect(() => {
+  const updateViewportOffset = () => {
+    const vv = window.visualViewport;
+    setViewportOffsetTop(vv ? vv.offsetTop : 0);
+  };
+
+  updateViewportOffset();
+
+  window.visualViewport?.addEventListener("resize", updateViewportOffset);
+  window.visualViewport?.addEventListener("scroll", updateViewportOffset);
+  window.addEventListener("resize", updateViewportOffset);
+
+  return () => {
+    window.visualViewport?.removeEventListener("resize", updateViewportOffset);
+    window.visualViewport?.removeEventListener("scroll", updateViewportOffset);
+    window.removeEventListener("resize", updateViewportOffset);
+  };
+}, []);
   const ATTACHMENTS = [
     { title: "Warfighter’s Fitness Playbook", subtitle: "2.0 • Feb 2026", url: "/attachments/Playbook.pdf", filename: "Playbook.pdf" },
     {
@@ -659,21 +678,16 @@ const showMobileStickySummary = mobileMode && hasActivatedStickySummary;
   <div
     style={{
       position: "fixed",
-      top: 8,
+      top: `calc(env(safe-area-inset-top, 0px) + 8px + ${viewportOffsetTop}px)`,
       left: "50%",
       transform: "translateX(-50%)",
       zIndex: 3000,
       width: "calc(100vw - 24px)",
       maxWidth: mobileMode ? 896 : 1052,
       pointerEvents: "none",
-      borderRadius: 12,
-        border: "1px solid rgba(255,255,255,0.12)",
-        background: "rgba(4, 26, 58, 0.96)",
-        boxShadow: "0 8px 18px rgba(0,0,0,0.28)",
-        padding: "8px 10px",
     }}
   >
-                <div
+    <div
       style={{
         borderRadius: 12,
         border: "1px solid rgba(255,255,255,0.12)",
@@ -682,43 +696,43 @@ const showMobileStickySummary = mobileMode && hasActivatedStickySummary;
         padding: "8px 10px",
       }}
     >
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(5, minmax(0, 1fr)",
-                  gap: 6,
-                  alignItems: "center",
-                  textAlign: "center",
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>WHtR</div>
-                  <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedWHtR.toFixed(1)}</div>
-                </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+          gap: 6,
+          alignItems: "center",
+          textAlign: "center",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>WHtR</div>
+          <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedWHtR.toFixed(1)}</div>
+        </div>
 
-                <div>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>STR</div>
-                  <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedStrength.toFixed(1)}</div>
-                </div>
+        <div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>STR</div>
+          <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedStrength.toFixed(1)}</div>
+        </div>
 
-                <div>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CORE</div>
-                  <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCore.toFixed(1)}</div>
-                </div>
+        <div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CORE</div>
+          <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCore.toFixed(1)}</div>
+        </div>
 
-                <div>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CARD</div>
-                  <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCardio.toFixed(1)}</div>
-                </div>
+        <div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CARD</div>
+          <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCardio.toFixed(1)}</div>
+        </div>
 
-                <div>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.80)", fontWeight: 900 }}>TOTAL</div>
-                  <div style={{ fontSize: 16, fontWeight: 950 }}>{total.toFixed(1)}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.80)", fontWeight: 900 }}>TOTAL</div>
+          <div style={{ fontSize: 16, fontWeight: 950 }}>{total.toFixed(1)}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
         {/* Accent stripe */}
         <div
