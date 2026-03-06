@@ -169,14 +169,13 @@ function AttachmentTile(props: {
  * (Single standard for all ages / all genders)
  */
 
-// Strength/Core points (15.0 down to 2.5) — value must be >= min to earn points
 const AFSPEC_STRENGTH_CORE: Array<{
   pts: number;
   pushups: number;
   hrpu: number;
   situps: number;
   revCrunch: number;
-  plankMin: string; // mm:ss (minimum time to earn points)
+  plankMin: string;
 }> = [
   { pts: 15.0, pushups: 67, hrpu: 52, situps: 58, revCrunch: 60, plankMin: "3:40" },
   { pts: 14.5, pushups: 66, hrpu: 51, situps: 57, revCrunch: 59, plankMin: "3:35" },
@@ -206,7 +205,6 @@ const AFSPEC_STRENGTH_CORE: Array<{
   { pts: 2.5, pushups: 30, hrpu: 27, situps: 33, revCrunch: 35, plankMin: "1:35" },
 ];
 
-// Cardio points (50.0 down to 35.0) — 2-mile must be <= max time; HAMR must be >= min shuttles
 const AFSPEC_CARDIO: Array<{ pts: number; runMax: string; hamrMin: number }> = [
   { pts: 50.0, runMax: "13:25", hamrMin: 87 },
   { pts: 49.5, runMax: "13:44", hamrMin: 84 },
@@ -273,7 +271,12 @@ export default function App() {
 
   const ATTACHMENTS = [
     { title: "Warfighter’s Fitness Playbook", subtitle: "2.0 • Feb 2026", url: "/attachments/Playbook.pdf", filename: "Playbook.pdf" },
-    { title: "PFRA Scoring Charts", subtitle: "Includes AFSPECWAR/EOD page", url: "/attachments/PFRA_Scoring_Charts.pdf", filename: "PFRA_Scoring_Charts.pdf" },
+    {
+      title: "PFRA Scoring Charts",
+      subtitle: "Includes AFSPECWAR/EOD page",
+      url: "/attachments/PFRA_Scoring_Charts.pdf",
+      filename: "PFRA_Scoring_Charts.pdf",
+    },
     { title: "DAFMAN 36-2905 IC", subtitle: "22 Jan 2026", url: "/attachments/DAFMAN.pdf", filename: "DAFMAN.pdf" },
   ] as const;
 
@@ -299,7 +302,6 @@ export default function App() {
   const [height, setHeight] = useState("");
   const [waist, setWaist] = useState("");
 
-  // Exemptions selectable; score ALWAYS prorated (no toggle).
   const [exemptWHtR, setExemptWHtR] = useState(false);
   const [exemptStrength, setExemptStrength] = useState(false);
   const [exemptCore, setExemptCore] = useState(false);
@@ -311,7 +313,6 @@ export default function App() {
     window.setTimeout(() => setToast(null), 2600);
   }
 
-  // Responsive
   const [vw, setVw] = useState<number>(() => (typeof window !== "undefined" ? window.innerWidth : 1200));
   useEffect(() => {
     const onResize = () => setVw(window.innerWidth);
@@ -322,13 +323,11 @@ export default function App() {
   const isNarrow = vw < 980;
   const isVeryNarrow = vw < 680;
 
-  // Mobile Mode toggle (defaults ON for small screens)
   const [mobileMode, setMobileMode] = useState<boolean>(() => (typeof window !== "undefined" ? window.innerWidth < 680 : false));
   useEffect(() => {
     if (vw < 680) setMobileMode(true);
   }, [vw]);
 
-  // ---- Section jump refs (mobile) ----
   const profileRef = useRef<HTMLDivElement | null>(null);
   const whtrRef = useRef<HTMLDivElement | null>(null);
   const strengthRef = useRef<HTMLDivElement | null>(null);
@@ -336,14 +335,13 @@ export default function App() {
   const cardioRef = useRef<HTMLDivElement | null>(null);
   const downloadsRef = useRef<HTMLDivElement | null>(null);
 
-  function scrollToRef(ref: React.RefObject<HTMLDivElement>) {
+  function scrollToRef(ref: React.RefObject<HTMLDivElement | null>) {
     const el = ref.current;
     if (!el) return;
     const y = el.getBoundingClientRect().top + (window.pageYOffset || window.scrollY || 0) - 10;
     window.scrollTo({ top: y, behavior: "smooth" });
   }
 
-  // ----- Derived -----
   const ageBand = useMemo(() => {
     const a = parseNumber(age);
     return a == null ? "Under 25" : getAgeBand(a);
@@ -438,7 +436,6 @@ export default function App() {
     return sh == null ? 0 : lookupAFSPECHamrPoints(sh);
   }, [exemptCardio, isAFSPEC, cardioTest, run2MileTime, hamrShuttles, ageBand, gender]);
 
-  // ALWAYS PRORATED
   const maxWHtR = 20;
   const maxStrength = 15;
   const maxCore = 15;
@@ -468,82 +465,30 @@ export default function App() {
   const badge = scoreColor(total);
   const showDiagnostic = isDiagnosticWindow();
 
-  // ----- Mobile ticker: show when header scrolls out of view (IntersectionObserver; mobile-safe) -----
-  const headerRef = useRef<HTMLDivElement | null>(null);
-  const tickerSentinelRef = useRef<HTMLDivElement | null>(null);
-  const [showMobileTicker, setShowMobileTicker] = useState(false);
-
-  const hasAnyInput = useMemo(() => {
-    return (
-      age.trim() !== "" ||
-      height.trim() !== "" ||
-      waist.trim() !== "" ||
-      pushupReps.trim() !== "" ||
-      hrpuReps.trim() !== "" ||
-      situpReps.trim() !== "" ||
-      reverseCrunchReps.trim() !== "" ||
-      plankTime.trim() !== "" ||
-      run2MileTime.trim() !== "" ||
-      hamrShuttles.trim() !== "" ||
-      exemptWHtR ||
-      exemptStrength ||
-      exemptCore ||
-      exemptCardio
-    );
-  }, [
-    age,
-    height,
-    waist,
-    pushupReps,
-    hrpuReps,
-    situpReps,
-    reverseCrunchReps,
-    plankTime,
-    run2MileTime,
-    hamrShuttles,
-    exemptWHtR,
-    exemptStrength,
-    exemptCore,
-    exemptCardio,
-  ]);
-
-  const isPhone = vw < 820;
-
-  // Show ticker only after any interaction (typing or exemption selection)
-  const engaged = hasAnyInput;
+  // Mobile-only sticky summary
+  const [scrollY, setScrollY] = useState(0);
 
   useEffect(() => {
-    // Only care on phone-ish layouts
-    if (!(mobileMode || isPhone)) {
-      setShowMobileTicker(false);
-      return;
-    }
+    const onScroll = () => {
+      const y = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+      setScrollY(y);
+    };
 
-    const sentinel = tickerSentinelRef.current;
-    if (!sentinel) return;
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
 
-    const io = new IntersectionObserver(
-      (entries) => {
-        const e = entries[0];
-        const pastHeader = !e.isIntersecting; // sentinel has scrolled out of view
-        setShowMobileTicker(pastHeader && engaged);
-      },
-      { root: null, threshold: 0.01 }
-    );
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
-    io.observe(sentinel);
-    return () => io.disconnect();
-  }, [mobileMode, isPhone, engaged]);
+  const showMobileStickySummary = mobileMode && scrollY > 80;
 
-  // ----- Visual System -----
+  // Visual system
   const pageBg = "#041A3A";
   const panelBg = "rgba(8, 18, 38, 0.76)";
   const panelBorder = "1px solid rgba(255,255,255,0.12)";
   const subtleText = "rgba(255,255,255,0.80)";
   const faintText = "rgba(255,255,255,0.62)";
   const accent = "#6EC1FF";
-
-  const containerMaxWidth = mobileMode ? 920 : 1080;
 
   const pad = mobileMode ? 10 : 12;
   const inputPad = mobileMode ? "10px 11px" : "11px 12px";
@@ -640,10 +585,6 @@ export default function App() {
     if (mobileMode) setShowBreakdown(false);
   }, [mobileMode]);
 
-  // Ticker sizing: big enough to cover "USAF FITNESS / PFRA Scoring Dashboard"
-  const tickerHeight = 66;
-  const tickerOffsetTop = 8;
-
   return (
     <div
       style={{
@@ -690,7 +631,6 @@ export default function App() {
             font-size: 12px;
           }
 
-          /* dropdown option visibility (Windows/Edge) */
           .af-select {
             color: #fff;
             background: rgba(255,255,255,0.06);
@@ -706,86 +646,65 @@ export default function App() {
         `}
       </style>
 
-      {/* Mobile Score Ticker (appears after scrolling past header + any interaction) */}
-      {showMobileTicker && (
-        <div
-          style={{
-            position: "fixed",
-            top: tickerOffsetTop,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 9998,
-
-            // ONLY as wide as the dashboard container (not full screen)
-            width: `calc(min(100vw - 16px, ${containerMaxWidth}px))`,
-            height: tickerHeight,
-
-            borderRadius: 14,
-            background: "rgba(0,0,0,0.62)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            boxShadow: "0 10px 22px rgba(0,0,0,0.35)",
-
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "10px 12px",
-            gap: 10,
-
-            // Does NOT block taps on inputs below
-            pointerEvents: "none",
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 950, letterSpacing: 1.1, color: "rgba(255,255,255,0.75)" }}>
-              SCORES
-            </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "baseline", whiteSpace: "nowrap" }}>
-              <div style={{ fontSize: 22, fontWeight: 950, lineHeight: 1 }}>{total.toFixed(1)}</div>
-              <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.72)", fontWeight: 900 }}>TOTAL</div>
-            </div>
-          </div>
-
+      <div style={{ width: "100%", maxWidth: mobileMode ? 920 : 1080, padding: mobileMode ? 12 : 14 }}>
+        {showMobileStickySummary && (
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              fontSize: 12,
-              fontWeight: 900,
-              color: "rgba(255,255,255,0.88)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              position: "sticky",
+              top: 0,
+              zIndex: 3000,
+              marginBottom: 10,
+              paddingTop: 4,
             }}
           >
-            <span style={{ color: "rgba(255,255,255,0.70)" }}>WHtR</span>
-            <span>{earnedWHtR.toFixed(1)}</span>
-            <span style={{ opacity: 0.35 }}>•</span>
+            <div
+              style={{
+                width: "100%",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(4, 26, 58, 0.96)",
+                boxShadow: "0 8px 18px rgba(0,0,0,0.28)",
+                padding: "8px 10px",
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(5, 1fr)",
+                  gap: 6,
+                  alignItems: "center",
+                  textAlign: "center",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>WHtR</div>
+                  <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedWHtR.toFixed(1)}</div>
+                </div>
 
-            <span style={{ color: "rgba(255,255,255,0.70)" }}>STR</span>
-            <span>{earnedStrength.toFixed(1)}</span>
-            <span style={{ opacity: 0.35 }}>•</span>
+                <div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>STR</div>
+                  <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedStrength.toFixed(1)}</div>
+                </div>
 
-            <span style={{ color: "rgba(255,255,255,0.70)" }}>CORE</span>
-            <span>{earnedCore.toFixed(1)}</span>
-            <span style={{ opacity: 0.35 }}>•</span>
+                <div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CORE</div>
+                  <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCore.toFixed(1)}</div>
+                </div>
 
-            <span style={{ color: "rgba(255,255,255,0.70)" }}>CARD</span>
-            <span>{earnedCardio.toFixed(1)}</span>
+                <div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CARD</div>
+                  <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCardio.toFixed(1)}</div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.80)", fontWeight: 900 }}>TOTAL</div>
+                  <div style={{ fontSize: 16, fontWeight: 950 }}>{total.toFixed(1)}</div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div
-        style={{
-          width: "100%",
-          maxWidth: containerMaxWidth,
-          padding: mobileMode ? 12 : 14,
-          // leave room so ticker doesn't cover the top after it appears
-          paddingTop: (mobileMode ? 12 : 14) + (showMobileTicker ? tickerOffsetTop + tickerHeight + 10 : 0),
-        }}
-      >
         {/* Accent stripe */}
         <div
           style={{
@@ -796,9 +715,8 @@ export default function App() {
           }}
         />
 
-        {/* Top Command Bar (NOT STICKY) */}
+        {/* Top Command Bar */}
         <div
-          ref={headerRef}
           style={{
             display: "flex",
             flexDirection: isVeryNarrow ? "column" : "row",
@@ -901,10 +819,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Sentinel: when this scrolls out of view, show ticker */}
-        <div ref={tickerSentinelRef} style={{ height: 1 }} />
-
-        {/* KPI Row (NOT STICKY) */}
+        {/* KPI Row */}
         <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: kpiCols, gap: 8 }}>
           <div style={kpiCardStyle}>
             <div style={kpiLabelStyle}>WHtR</div>
@@ -917,9 +832,7 @@ export default function App() {
           <div style={kpiCardStyle}>
             <div style={kpiLabelStyle}>STRENGTH</div>
             <div style={kpiValueStyle}>{earnedStrength.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>
-              {exemptStrength ? "Exempt" : strengthTest === "pushups" ? "Push-ups" : "HRPU"}
-            </div>
+            <div style={{ fontSize: 11, color: faintText }}>{exemptStrength ? "Exempt" : strengthTest === "pushups" ? "Push-ups" : "HRPU"}</div>
           </div>
 
           <div style={kpiCardStyle}>
@@ -933,9 +846,7 @@ export default function App() {
           <div style={kpiCardStyle}>
             <div style={kpiLabelStyle}>CARDIO</div>
             <div style={kpiValueStyle}>{earnedCardio.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>
-              {exemptCardio ? "Exempt" : cardioTest === "2mile" ? "2-mile run" : "HAMR"}
-            </div>
+            <div style={{ fontSize: 11, color: faintText }}>{exemptCardio ? "Exempt" : cardioTest === "2mile" ? "2-mile run" : "HAMR"}</div>
           </div>
         </div>
 
@@ -1007,15 +918,14 @@ export default function App() {
                 <span style={{ color: "#FFF" }}>AFSPECWAR/EOD universal chart</span>
               ) : (
                 <>
-                  Band: <span style={{ color: "#FFF" }}>{ageBand}</span> ·{" "}
-                  <span style={{ color: "#FFF" }}>{gender === "M" ? "Male" : "Female"}</span>
+                  Band: <span style={{ color: "#FFF" }}>{ageBand}</span> · <span style={{ color: "#FFF" }}>{gender === "M" ? "Male" : "Female"}</span>
                 </>
               )}
             </div>
           </div>
         )}
 
-        {/* Exemptions (ALWAYS PRORATED; no toggle) */}
+        {/* Exemptions */}
         <div style={{ marginTop: 10, ...cardStyle }}>
           <div style={sectionTitleStyle}>
             <span>Exemptions</span>
@@ -1139,8 +1049,7 @@ export default function App() {
                   Raw: <strong style={{ color: "#FFF" }}>{exemptWHtR ? "—" : whtrData.raw == null ? "—" : whtrData.raw.toFixed(4)}</strong>
                 </div>
                 <div style={{ fontSize: 11.5, color: faintText }}>
-                  Rounded:{" "}
-                  <strong style={{ color: "#FFF" }}>{exemptWHtR ? "—" : whtrData.rounded == null ? "—" : whtrData.rounded.toFixed(2)}</strong>
+                  Rounded: <strong style={{ color: "#FFF" }}>{exemptWHtR ? "—" : whtrData.rounded == null ? "—" : whtrData.rounded.toFixed(2)}</strong>
                 </div>
                 <div style={{ fontSize: 11.5, color: faintText }}>
                   Points: <strong style={{ color: "#FFF" }}>{earnedWHtR.toFixed(1)}</strong>
