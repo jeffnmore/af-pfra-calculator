@@ -480,7 +480,7 @@ export default function App() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const showMobileStickySummary = mobileMode && scrollY > 80;
+  const showMobileStickySummary = mobileMode && scrollY > 40;
 
   // Visual system
   const pageBg = "#041A3A";
@@ -648,29 +648,31 @@ export default function App() {
 
       <div style={{ width: "100%", maxWidth: mobileMode ? 920 : 1080, padding: mobileMode ? 12 : 14 }}>
         {showMobileStickySummary && (
-          <div
-            style={{
-              position: "sticky",
-              top: 0,
-              zIndex: 3000,
-              marginBottom: 10,
-              paddingTop: 4,
-            }}
-          >
-            <div
-              style={{
-                width: "100%",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,0.12)",
-                background: "rgba(4, 26, 58, 0.96)",
-                boxShadow: "0 8px 18px rgba(0,0,0,0.28)",
-                padding: "8px 10px",
-              }}
-            >
+  <div
+    style={{
+      position: "fixed",
+      top: 8,
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 3000,
+      width: "calc(100vw - 24px)",
+      maxWidth: mobileMode ? 896 : 1052,
+      pointerEvents: "none",
+    }}
+  >
+                <div
+      style={{
+        borderRadius: 12,
+        border: "1px solid rgba(255,255,255,0.12)",
+        background: "rgba(4, 26, 58, 0.96)",
+        boxShadow: "0 8px 18px rgba(0,0,0,0.28)",
+        padding: "8px 10px",
+      }}
+    >
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(5, 1fr)",
+                  gridTemplateColumns: "repeat(5, minmax(0, 1fr)",
                   gap: 6,
                   alignItems: "center",
                   textAlign: "center",
@@ -711,7 +713,6 @@ export default function App() {
             height: 4,
             borderRadius: 999,
             background: `linear-gradient(90deg, ${accent} 0%, rgba(110,193,255,0.25) 55%, rgba(110,193,255,0.00) 100%)`,
-            marginBottom: 10,
           }}
         />
 
@@ -1088,7 +1089,7 @@ export default function App() {
                 {!mobileMode && (
                   <div>
                     <div style={labelStyle}>Points</div>
-                    <div style={{ fontSize: 24, fontWeight: 950, paddingTop: 4 }}>{earnedStrength.toFixed(1)}</div>
+                    <div style={{ fontSize: 24, fontWeight: 950, }}>{earnedStrength.toFixed(1)}</div>
                   </div>
                 )}
               </div>
