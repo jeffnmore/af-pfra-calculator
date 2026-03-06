@@ -92,7 +92,6 @@ function isDiagnosticWindow(): boolean {
   return now < cutoff;
 }
 
-// Bulletproof download (avoids PDF viewer weirdness)
 async function forceDownload(url: string, filename: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to download: ${res.status}`);
@@ -268,26 +267,7 @@ function lookupAFSPECHamrPoints(shuttles: number): number {
 export default function App() {
   const APP_VERSION = "1.0.0";
   const APP_UPDATED = "2026-03-04";
-const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
 
-useEffect(() => {
-  const updateViewportOffset = () => {
-    const vv = window.visualViewport;
-    setViewportOffsetTop(vv ? vv.offsetTop : 0);
-  };
-
-  updateViewportOffset();
-
-  window.visualViewport?.addEventListener("resize", updateViewportOffset);
-  window.visualViewport?.addEventListener("scroll", updateViewportOffset);
-  window.addEventListener("resize", updateViewportOffset);
-
-  return () => {
-    window.visualViewport?.removeEventListener("resize", updateViewportOffset);
-    window.visualViewport?.removeEventListener("scroll", updateViewportOffset);
-    window.removeEventListener("resize", updateViewportOffset);
-  };
-}, []);
   const ATTACHMENTS = [
     { title: "Warfighter’s Fitness Playbook", subtitle: "2.0 • Feb 2026", url: "/attachments/Playbook.pdf", filename: "Playbook.pdf" },
     {
@@ -484,8 +464,10 @@ useEffect(() => {
   const badge = scoreColor(total);
   const showDiagnostic = isDiagnosticWindow();
 
-  // Mobile-only sticky summary
+  // Mobile-only fixed summary that stays on once activated
   const [scrollY, setScrollY] = useState(0);
+  const [hasActivatedStickySummary, setHasActivatedStickySummary] = useState(false);
+  const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
 
   useEffect(() => {
     const onScroll = () => {
@@ -499,17 +481,33 @@ useEffect(() => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const [hasActivatedStickySummary, setHasActivatedStickySummary] = useState(false);
+  useEffect(() => {
+    if (mobileMode && scrollY > 40) {
+      setHasActivatedStickySummary(true);
+    }
+  }, [mobileMode, scrollY]);
 
-useEffect(() => {
-  if (mobileMode && scrollY > 40) {
-    setHasActivatedStickySummary(true);
-  }
-}, [mobileMode, scrollY]);
+  useEffect(() => {
+    const updateViewportOffset = () => {
+      const vv = window.visualViewport;
+      setViewportOffsetTop(vv ? vv.offsetTop : 0);
+    };
 
-const showMobileStickySummary = mobileMode && hasActivatedStickySummary;
+    updateViewportOffset();
 
-  // Visual system
+    window.visualViewport?.addEventListener("resize", updateViewportOffset);
+    window.visualViewport?.addEventListener("scroll", updateViewportOffset);
+    window.addEventListener("resize", updateViewportOffset);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateViewportOffset);
+      window.visualViewport?.removeEventListener("scroll", updateViewportOffset);
+      window.removeEventListener("resize", updateViewportOffset);
+    };
+  }, []);
+
+  const showMobileStickySummary = mobileMode && hasActivatedStickySummary;
+
   const pageBg = "#041A3A";
   const panelBg = "rgba(8, 18, 38, 0.76)";
   const panelBorder = "1px solid rgba(255,255,255,0.12)";
@@ -673,73 +671,74 @@ const showMobileStickySummary = mobileMode && hasActivatedStickySummary;
         `}
       </style>
 
+      {showMobileStickySummary && (
+        <div
+          style={{
+            position: "fixed",
+            top: `calc(env(safe-area-inset-top, 0px) + 8px + ${viewportOffsetTop}px)`,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 3000,
+            width: "calc(100vw - 24px)",
+            maxWidth: mobileMode ? 896 : 1052,
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(4, 26, 58, 0.96)",
+              boxShadow: "0 8px 18px rgba(0,0,0,0.28)",
+              padding: "8px 10px",
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+                gap: 6,
+                alignItems: "center",
+                textAlign: "center",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>WHtR</div>
+                <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedWHtR.toFixed(1)}</div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>STR</div>
+                <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedStrength.toFixed(1)}</div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CORE</div>
+                <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCore.toFixed(1)}</div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CARD</div>
+                <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCardio.toFixed(1)}</div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.80)", fontWeight: 900 }}>TOTAL</div>
+                <div style={{ fontSize: 16, fontWeight: 950 }}>{total.toFixed(1)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ width: "100%", maxWidth: mobileMode ? 920 : 1080, padding: mobileMode ? 12 : 14 }}>
-        {showMobileStickySummary && (
-  <div
-    style={{
-      position: "fixed",
-      top: `calc(env(safe-area-inset-top, 0px) + 8px + ${viewportOffsetTop}px)`,
-      left: "50%",
-      transform: "translateX(-50%)",
-      zIndex: 3000,
-      width: "calc(100vw - 24px)",
-      maxWidth: mobileMode ? 896 : 1052,
-      pointerEvents: "none",
-    }}
-  >
-    <div
-      style={{
-        borderRadius: 12,
-        border: "1px solid rgba(255,255,255,0.12)",
-        background: "rgba(4, 26, 58, 0.96)",
-        boxShadow: "0 8px 18px rgba(0,0,0,0.28)",
-        padding: "8px 10px",
-      }}
-    >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-          gap: 6,
-          alignItems: "center",
-          textAlign: "center",
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>WHtR</div>
-          <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedWHtR.toFixed(1)}</div>
-        </div>
-
-        <div>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>STR</div>
-          <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedStrength.toFixed(1)}</div>
-        </div>
-
-        <div>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CORE</div>
-          <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCore.toFixed(1)}</div>
-        </div>
-
-        <div>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CARD</div>
-          <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCardio.toFixed(1)}</div>
-        </div>
-
-        <div>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.80)", fontWeight: 900 }}>TOTAL</div>
-          <div style={{ fontSize: 16, fontWeight: 950 }}>{total.toFixed(1)}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
-
         {/* Accent stripe */}
         <div
           style={{
             height: 4,
             borderRadius: 999,
             background: `linear-gradient(90deg, ${accent} 0%, rgba(110,193,255,0.25) 55%, rgba(110,193,255,0.00) 100%)`,
+            marginBottom: 10,
           }}
         />
 
@@ -759,9 +758,7 @@ const showMobileStickySummary = mobileMode && hasActivatedStickySummary;
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 900, letterSpacing: 1.15, color: "rgba(255,255,255,0.72)" }}>
-              USAF FITNESS
-            </div>
+            <div style={{ fontSize: 11.5, fontWeight: 900, letterSpacing: 1.15, color: "rgba(255,255,255,0.72)" }}>USAF FITNESS</div>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
               <div style={{ fontSize: 16.5, fontWeight: 950, letterSpacing: 0.3 }}>PFRA Scoring Dashboard</div>
@@ -1116,7 +1113,7 @@ const showMobileStickySummary = mobileMode && hasActivatedStickySummary;
                 {!mobileMode && (
                   <div>
                     <div style={labelStyle}>Points</div>
-                    <div style={{ fontSize: 24, fontWeight: 950, }}>{earnedStrength.toFixed(1)}</div>
+                    <div style={{ fontSize: 24, fontWeight: 950, paddingTop: 4 }}>{earnedStrength.toFixed(1)}</div>
                   </div>
                 )}
               </div>
@@ -1366,7 +1363,6 @@ const showMobileStickySummary = mobileMode && hasActivatedStickySummary;
         </div>
       </div>
 
-      {/* Toast */}
       {toast && (
         <div
           style={{
