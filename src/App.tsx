@@ -480,7 +480,15 @@ export default function App() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const showMobileStickySummary = mobileMode && scrollY > 40;
+  const [hasActivatedStickySummary, setHasActivatedStickySummary] = useState(false);
+
+useEffect(() => {
+  if (mobileMode && scrollY > 40) {
+    setHasActivatedStickySummary(true);
+  }
+}, [mobileMode, scrollY]);
+
+const showMobileStickySummary = mobileMode && hasActivatedStickySummary;
 
   // Visual system
   const pageBg = "#041A3A";
@@ -658,6 +666,11 @@ export default function App() {
       width: "calc(100vw - 24px)",
       maxWidth: mobileMode ? 896 : 1052,
       pointerEvents: "none",
+      borderRadius: 12,
+        border: "1px solid rgba(255,255,255,0.12)",
+        background: "rgba(4, 26, 58, 0.96)",
+        boxShadow: "0 8px 18px rgba(0,0,0,0.28)",
+        padding: "8px 10px",
     }}
   >
                 <div
