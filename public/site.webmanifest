@@ -1,0 +1,10 @@
+{
+  "name": "USAF PFRA Calculator",
+  "short_name": "PFRA Calc",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#00308F",
+  "theme_color": "#00308F",
+  "description": "Free Air Force fitness score calculator for PFRA and AFSPECWAR/EOD testing.",
+  "icons": []
+}

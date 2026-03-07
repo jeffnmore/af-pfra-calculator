@@ -17,6 +17,12 @@ type CoreTest = "situps" | "reverse_crunch" | "plank";
 type CardioTest = "2mile" | "hamr";
 type TestProgram = "PFRA" | "AFSPECWAR_EOD";
 
+type MetaOptions = {
+  name?: string;
+  property?: string;
+  content: string;
+};
+
 function parseNumber(s: string): number | null {
   const n = Number(String(s).trim());
   return Number.isFinite(n) ? n : null;
@@ -35,7 +41,6 @@ function getAgeBand(age: number): string {
   return "60 and Over";
 }
 
-// PFRA rows are [points, minValue] in descending points order; value must be >= minValue
 function lookupMinValuePointsPFRA(table: any, ageBand: string, gender: Gender, value: number): number {
   if (!Number.isFinite(value) || value < 0) return 0;
   const band = table.bands?.[ageBand];
@@ -64,7 +69,6 @@ function timeToSeconds(input: string): number | null {
   return mm * 60 + ss;
 }
 
-// PFRA rows are [points, maxTime "mm:ss"] in descending points order; time must be <= maxTime
 function lookupMaxTimePointsPFRA(table: any, ageBand: string, gender: Gender, timeSec: number): number {
   if (!Number.isFinite(timeSec) || timeSec < 0) return 0;
 
@@ -88,8 +92,47 @@ function scoreColor(total: number): { bg: string; fg: string; label: string } {
 
 function isDiagnosticWindow(): boolean {
   const now = new Date();
-  const cutoff = new Date(2026, 6, 1, 0, 0, 0, 0); // July 1, 2026
+  const cutoff = new Date(2026, 6, 1, 0, 0, 0, 0);
   return now < cutoff;
+}
+
+function upsertMetaTag({ name, property, content }: MetaOptions) {
+  if (typeof document === "undefined") return;
+
+  const selector = name ? `meta[name="${name}"]` : `meta[property="${property}"]`;
+  let tag = document.head.querySelector(selector) as HTMLMetaElement | null;
+
+  if (!tag) {
+    tag = document.createElement("meta");
+    if (name) tag.setAttribute("name", name);
+    if (property) tag.setAttribute("property", property);
+    document.head.appendChild(tag);
+  }
+
+  tag.setAttribute("content", content);
+}
+
+function upsertLinkTag(rel: string, href: string) {
+  if (typeof document === "undefined") return;
+  let tag = document.head.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+  if (!tag) {
+    tag = document.createElement("link");
+    tag.setAttribute("rel", rel);
+    document.head.appendChild(tag);
+  }
+  tag.setAttribute("href", href);
+}
+
+function upsertJsonLd(id: string, data: Record<string, unknown>) {
+  if (typeof document === "undefined") return;
+  let tag = document.getElementById(id) as HTMLScriptElement | null;
+  if (!tag) {
+    tag = document.createElement("script");
+    tag.type = "application/ld+json";
+    tag.id = id;
+    document.head.appendChild(tag);
+  }
+  tag.text = JSON.stringify(data);
 }
 
 async function forceDownload(url: string, filename: string) {
@@ -121,19 +164,19 @@ function AttachmentTile(props: {
   return (
     <div
       style={{
-        padding: 10,
-        borderRadius: 12,
+        padding: 12,
+        borderRadius: 14,
         border: "1px solid rgba(255,255,255,0.10)",
         background: "rgba(255,255,255,0.03)",
         display: "flex",
         flexDirection: "column",
-        gap: 8,
-        minHeight: 82,
+        gap: 10,
+        minHeight: 96,
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <div style={{ fontWeight: 950, letterSpacing: 0.2, fontSize: 12.5, lineHeight: 1.15 }}>{title}</div>
-        {subtitle ? <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.58)" }}>{subtitle}</div> : null}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ fontWeight: 950, letterSpacing: 0.2, fontSize: 13, lineHeight: 1.2 }}>{title}</div>
+        {subtitle ? <div style={{ fontSize: 11, color: "rgba(255,255,255,0.58)" }}>{subtitle}</div> : null}
       </div>
 
       <div
@@ -162,11 +205,6 @@ function AttachmentTile(props: {
     </div>
   );
 }
-
-/**
- * AFSPECWAR/EOD page-10 universal standards
- * (Single standard for all ages / all genders)
- */
 
 const AFSPEC_STRENGTH_CORE: Array<{
   pts: number;
@@ -265,8 +303,24 @@ function lookupAFSPECHamrPoints(shuttles: number): number {
 }
 
 export default function App() {
-  const APP_VERSION = "1.0.0";
-  const APP_UPDATED = "2026-03-04";
+  const APP_VERSION = "1.1.0";
+  const APP_UPDATED = "2026-03-07";
+  const SITE_URL = "https://usafpfracalculator.com";
+  const PAGE_TITLE = "USAF PFRA Calculator | Air Force Fitness Test Score Calculator";
+  const META_DESCRIPTION =
+    "Free USAF PFRA calculator for Air Force fitness scoring. Estimate waist-to-height ratio, push-ups, hand-release push-ups, sit-ups, reverse crunch, plank, 2-mile run, HAMR, PFRA totals, and AFSPECWAR/EOD scores.";
+  const META_KEYWORDS = [
+    "USAF PFRA calculator",
+    "Air Force fitness calculator",
+    "PFRA score calculator",
+    "Air Force PT test calculator",
+    "USAF fitness test score",
+    "AFSPECWAR EOD calculator",
+    "2 mile run calculator",
+    "HAMR calculator",
+    "waist to height ratio calculator",
+    "hand release push ups calculator",
+  ].join(", ");
 
   const ATTACHMENTS = [
     { title: "Warfighter’s Fitness Playbook", subtitle: "2.0 • Feb 2026", url: "/attachments/Playbook.pdf", filename: "Playbook.pdf" },
@@ -280,24 +334,19 @@ export default function App() {
   ] as const;
 
   const [program, setProgram] = useState<TestProgram>("PFRA");
-
   const [age, setAge] = useState("");
   const [gender, setGender] = useState<Gender>("M");
-
   const [strengthTest, setStrengthTest] = useState<StrengthTest>("pushups");
   const [coreTest, setCoreTest] = useState<CoreTest>("situps");
   const [cardioTest, setCardioTest] = useState<CardioTest>("2mile");
 
   const [pushupReps, setPushupReps] = useState("");
   const [hrpuReps, setHrpuReps] = useState("");
-
   const [situpReps, setSitupReps] = useState("");
   const [reverseCrunchReps, setReverseCrunchReps] = useState("");
   const [plankTime, setPlankTime] = useState("");
-
   const [run2MileTime, setRun2MileTime] = useState("");
   const [hamrShuttles, setHamrShuttles] = useState("");
-
   const [height, setHeight] = useState("");
   const [waist, setWaist] = useState("");
 
@@ -321,23 +370,21 @@ export default function App() {
 
   const isNarrow = vw < 980;
   const isVeryNarrow = vw < 680;
-
   const [mobileMode, setMobileMode] = useState<boolean>(() => (typeof window !== "undefined" ? window.innerWidth < 680 : false));
+
   useEffect(() => {
     if (vw < 680) setMobileMode(true);
   }, [vw]);
 
-  const profileRef = useRef<HTMLDivElement | null>(null);
-  const whtrRef = useRef<HTMLDivElement | null>(null);
-  const strengthRef = useRef<HTMLDivElement | null>(null);
-  const coreRef = useRef<HTMLDivElement | null>(null);
-  const cardioRef = useRef<HTMLDivElement | null>(null);
-  const downloadsRef = useRef<HTMLDivElement | null>(null);
+  const introRef = useRef<HTMLElement | null>(null);
+  const calculatorRef = useRef<HTMLElement | null>(null);
+  const downloadsRef = useRef<HTMLElement | null>(null);
+  const faqRef = useRef<HTMLElement | null>(null);
 
-  function scrollToRef(ref: React.RefObject<HTMLDivElement | null>) {
+  function scrollToRef(ref: React.RefObject<HTMLElement | null>) {
     const el = ref.current;
     if (!el) return;
-    const y = el.getBoundingClientRect().top + (window.pageYOffset || window.scrollY || 0) - 10;
+    const y = el.getBoundingClientRect().top + (window.pageYOffset || window.scrollY || 0) - 12;
     window.scrollTo({ top: y, behavior: "smooth" });
   }
 
@@ -445,10 +492,7 @@ export default function App() {
   const earnedCore = corePoints;
   const earnedCardio = cardioPoints;
 
-  const earnedTotal = useMemo(
-    () => earnedWHtR + earnedStrength + earnedCore + earnedCardio,
-    [earnedWHtR, earnedStrength, earnedCore, earnedCardio]
-  );
+  const earnedTotal = useMemo(() => earnedWHtR + earnedStrength + earnedCore + earnedCardio, [earnedWHtR, earnedStrength, earnedCore, earnedCardio]);
 
   const availableMax = useMemo(() => {
     let m = 0;
@@ -460,68 +504,108 @@ export default function App() {
   }, [exemptWHtR, exemptStrength, exemptCore, exemptCardio]);
 
   const total = useMemo(() => (availableMax <= 0 ? 0 : (earnedTotal / availableMax) * 100), [earnedTotal, availableMax]);
-
   const badge = scoreColor(total);
   const showDiagnostic = isDiagnosticWindow();
 
-  // Mobile-only fixed summary that stays on once activated
-  const [scrollY, setScrollY] = useState(0);
-  const [hasActivatedStickySummary, setHasActivatedStickySummary] = useState(false);
-  const [viewportOffsetTop, setViewportOffsetTop] = useState(0);
-
   useEffect(() => {
-    const onScroll = () => {
-      const y = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
-      setScrollY(y);
-    };
+    document.title = PAGE_TITLE;
+    document.documentElement.lang = "en";
 
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
+    upsertMetaTag({ name: "description", content: META_DESCRIPTION });
+    upsertMetaTag({ name: "keywords", content: META_KEYWORDS });
+    upsertMetaTag({ name: "robots", content: "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" });
+    upsertMetaTag({ name: "theme-color", content: "#041A3A" });
+    upsertMetaTag({ property: "og:type", content: "website" });
+    upsertMetaTag({ property: "og:title", content: PAGE_TITLE });
+    upsertMetaTag({ property: "og:description", content: META_DESCRIPTION });
+    upsertMetaTag({ property: "og:url", content: SITE_URL });
+    upsertMetaTag({ property: "og:site_name", content: "USAF PFRA Calculator" });
+    upsertMetaTag({ name: "twitter:card", content: "summary_large_image" });
+    upsertMetaTag({ name: "twitter:title", content: PAGE_TITLE });
+    upsertMetaTag({ name: "twitter:description", content: META_DESCRIPTION });
+    upsertLinkTag("canonical", SITE_URL);
 
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    upsertJsonLd("pfra-webapp-schema", {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "USAF PFRA Calculator",
+      url: SITE_URL,
+      applicationCategory: "HealthApplication",
+      operatingSystem: "Any",
+      browserRequirements: "Requires JavaScript",
+      description: META_DESCRIPTION,
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+      featureList: [
+        "PFRA score calculator",
+        "AFSPECWAR/EOD score calculator",
+        "Waist-to-height ratio scoring",
+        "Push-ups and hand-release push-ups scoring",
+        "Sit-ups, reverse crunch, and plank scoring",
+        "2-mile run and HAMR scoring",
+        "Prorated exemption support",
+      ],
+    });
 
-  useEffect(() => {
-    if (mobileMode && scrollY > 40) {
-      setHasActivatedStickySummary(true);
-    }
-  }, [mobileMode, scrollY]);
-
-  useEffect(() => {
-    const updateViewportOffset = () => {
-      const vv = window.visualViewport;
-      setViewportOffsetTop(vv ? vv.offsetTop : 0);
-    };
-
-    updateViewportOffset();
-
-    window.visualViewport?.addEventListener("resize", updateViewportOffset);
-    window.visualViewport?.addEventListener("scroll", updateViewportOffset);
-    window.addEventListener("resize", updateViewportOffset);
-
-    return () => {
-      window.visualViewport?.removeEventListener("resize", updateViewportOffset);
-      window.visualViewport?.removeEventListener("scroll", updateViewportOffset);
-      window.removeEventListener("resize", updateViewportOffset);
-    };
-  }, []);
-
-  const showMobileStickySummary = mobileMode && hasActivatedStickySummary;
+    upsertJsonLd("pfra-faq-schema", {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: [
+        {
+          "@type": "Question",
+          name: "What does this USAF PFRA calculator estimate?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "It estimates PFRA component points for waist-to-height ratio, strength, core, cardio, prorated exemptions, and total score, and it also includes the universal AFSPECWAR/EOD chart.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Can I use the calculator for both the 2-mile run and the HAMR?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Yes. The cardio section lets you choose either the 2-mile run or the 20-meter HAMR shuttle count and calculates points for the selected program.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Does this calculator replace official Air Force guidance?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "No. It is a quick score-estimation tool. Users should still verify official scoring, exemptions, and program requirements with current Air Force guidance and local policy.",
+          },
+        },
+      ],
+    });
+  }, [META_DESCRIPTION, META_KEYWORDS, PAGE_TITLE, SITE_URL]);
 
   const pageBg = "#041A3A";
   const panelBg = "rgba(8, 18, 38, 0.76)";
   const panelBorder = "1px solid rgba(255,255,255,0.12)";
-  const subtleText = "rgba(255,255,255,0.80)";
+  const subtleText = "rgba(255,255,255,0.82)";
   const faintText = "rgba(255,255,255,0.62)";
   const accent = "#6EC1FF";
 
-  const pad = mobileMode ? 10 : 12;
-  const inputPad = mobileMode ? "10px 11px" : "11px 12px";
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: mobileMode ? "10px 11px" : "11px 12px",
+    borderRadius: 10,
+    border: "1px solid rgba(255,255,255,0.20)",
+    outline: "none",
+    fontSize: 14,
+    background: "rgba(255,255,255,0.06)",
+    color: "#FFFFFF",
+  };
+
+  const selectStyle: React.CSSProperties = { ...inputStyle };
 
   const cardStyle: React.CSSProperties = {
     background: panelBg,
-    borderRadius: 12,
-    padding: pad,
+    borderRadius: 14,
+    padding: mobileMode ? 12 : 14,
     border: panelBorder,
     boxShadow: "0 10px 26px rgba(0,0,0,0.22)",
     backdropFilter: "blur(6px)",
@@ -529,9 +613,9 @@ export default function App() {
 
   const sectionTitleStyle: React.CSSProperties = {
     fontWeight: 950,
-    marginBottom: mobileMode ? 8 : 10,
+    marginBottom: 10,
     color: "#FFFFFF",
-    letterSpacing: 0.25,
+    letterSpacing: 0.2,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
@@ -558,57 +642,31 @@ export default function App() {
     color: subtleText,
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: inputPad,
-    borderRadius: 10,
-    border: "1px solid rgba(255,255,255,0.20)",
-    outline: "none",
-    fontSize: 14,
-    background: "rgba(255,255,255,0.06)",
-    color: "#FFFFFF",
-  };
-
-  const selectStyle: React.CSSProperties = { ...inputStyle };
+  const gridCols = mobileMode ? "1fr" : isNarrow ? "1fr 1fr" : "repeat(4, minmax(0, 1fr))";
+  const mainCols = mobileMode ? "1fr" : isNarrow ? "1fr 1fr" : "1.15fr 1fr 1fr";
 
   const kpiCardStyle: React.CSSProperties = {
     ...cardStyle,
-    padding: mobileMode ? 10 : 11,
     display: "flex",
     flexDirection: "column",
     gap: 6,
-    minHeight: mobileMode ? 72 : 78,
+    minHeight: 78,
   };
 
-  const kpiValueStyle: React.CSSProperties = {
-    fontSize: mobileMode ? 24 : 26,
-    fontWeight: 950,
-    lineHeight: 1,
-    letterSpacing: 0.2,
-  };
-
-  const kpiLabelStyle: React.CSSProperties = {
-    fontSize: 11.5,
-    color: faintText,
-    fontWeight: 850,
-    letterSpacing: 0.6,
-  };
-
-  const gridCols = mobileMode ? "1fr" : isVeryNarrow ? "1fr" : isNarrow ? "1fr 1fr" : "1.05fr 1fr 1fr";
-  const kpiCols = mobileMode ? "1fr 1fr" : isVeryNarrow ? "1fr 1fr" : "repeat(4, 1fr)";
-
-  const disabledCard = (disabled: boolean): React.CSSProperties =>
-    disabled
-      ? {
-          opacity: 0.55,
-          filter: "grayscale(0.15)",
-        }
-      : {};
-
-  const [showBreakdown, setShowBreakdown] = useState<boolean>(() => !isVeryNarrow);
-  useEffect(() => {
-    if (mobileMode) setShowBreakdown(false);
-  }, [mobileMode]);
+  const seoKeywords = [
+    "USAF PFRA calculator",
+    "Air Force fitness calculator",
+    "Air Force PT score calculator",
+    "PFRA scoring charts",
+    "AFSPECWAR EOD score chart",
+    "waist-to-height ratio score",
+    "push-ups score",
+    "HRPU score",
+    "sit-ups score",
+    "plank score",
+    "2-mile run score",
+    "HAMR shuttle score",
+  ];
 
   return (
     <div
@@ -621,747 +679,455 @@ export default function App() {
         alignItems: "flex-start",
       }}
     >
-      <style>
-        {`
-          .af-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 10px 12px;
-            border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.14);
-            background: rgba(255,255,255,0.06);
-            color: rgba(255,255,255,0.92);
-            font-weight: 900;
-            letter-spacing: 0.2px;
-            cursor: pointer;
-            text-decoration: none;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-          }
-          .af-btn:hover { background: rgba(255,255,255,0.10); }
-          .af-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+      <style>{`
+        .af-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px 12px;
+          border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.14);
+          background: rgba(255,255,255,0.06);
+          color: rgba(255,255,255,0.94);
+          font-weight: 900;
+          letter-spacing: 0.2px;
+          cursor: pointer;
+          text-decoration: none;
+          user-select: none;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .af-btn:hover { background: rgba(255,255,255,0.10); }
+        .af-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        .af-btn--sm { padding: 8px 10px; border-radius: 10px; font-size: 12px; }
+        .af-btn--pill { padding: 8px 10px; border-radius: 999px; font-size: 12px; }
+        .af-select { color: #fff; background: rgba(255,255,255,0.06); }
+        .af-select option { color: #fff; background: #061a39; }
+        .af-section-anchor { scroll-margin-top: 16px; }
+      `}</style>
 
-          .af-btn--sm {
-            padding: 8px 10px;
-            border-radius: 10px;
-            font-size: 12px;
-            font-weight: 900;
-            letter-spacing: 0.15px;
-          }
-
-          .af-btn--pill {
-            padding: 8px 10px;
-            border-radius: 999px;
-            font-size: 12px;
-          }
-
-          .af-select {
-            color: #fff;
-            background: rgba(255,255,255,0.06);
-          }
-          .af-select option {
-            color: #fff;
-            background: #061a39;
-          }
-          .af-select:focus {
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(110,193,255,0.20);
-          }
-        `}
-      </style>
-
-      {showMobileStickySummary && (
-        <div
-          style={{
-            position: "fixed",
-            top: `calc(env(safe-area-inset-top, 0px) + 8px + ${viewportOffsetTop}px)`,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 3000,
-            width: "calc(100vw - 24px)",
-            maxWidth: mobileMode ? 896 : 1052,
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(4, 26, 58, 0.96)",
-              boxShadow: "0 8px 18px rgba(0,0,0,0.28)",
-              padding: "8px 10px",
-            }}
-          >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-                gap: 6,
-                alignItems: "center",
-                textAlign: "center",
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>WHtR</div>
-                <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedWHtR.toFixed(1)}</div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>STR</div>
-                <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedStrength.toFixed(1)}</div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CORE</div>
-                <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCore.toFixed(1)}</div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>CARD</div>
-                <div style={{ fontSize: 14, fontWeight: 950 }}>{earnedCardio.toFixed(1)}</div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.80)", fontWeight: 900 }}>TOTAL</div>
-                <div style={{ fontSize: 16, fontWeight: 950 }}>{total.toFixed(1)}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div style={{ width: "100%", maxWidth: mobileMode ? 920 : 1080, padding: mobileMode ? 12 : 14 }}>
-        {/* Accent stripe */}
+      <main style={{ width: "100%", maxWidth: 1160, padding: mobileMode ? 12 : 16 }}>
         <div
           style={{
             height: 4,
             borderRadius: 999,
             background: `linear-gradient(90deg, ${accent} 0%, rgba(110,193,255,0.25) 55%, rgba(110,193,255,0.00) 100%)`,
-            marginBottom: 10,
+            marginBottom: 12,
           }}
         />
 
-        {/* Top Command Bar */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: isVeryNarrow ? "column" : "row",
-            alignItems: isVeryNarrow ? "stretch" : "center",
-            justifyContent: "space-between",
-            gap: 10,
-            padding: "10px 12px",
-            borderRadius: 14,
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(0, 0, 0, 0.18)",
-            boxShadow: "0 10px 22px rgba(0,0,0,0.25)",
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 900, letterSpacing: 1.15, color: "rgba(255,255,255,0.72)" }}>USAF FITNESS</div>
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
-              <div style={{ fontSize: 16.5, fontWeight: 950, letterSpacing: 0.3 }}>PFRA Scoring Dashboard</div>
-              <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.60)" }}>
-                v{APP_VERSION} · Updated {APP_UPDATED}
-              </div>
-            </div>
-
-            <div style={{ fontSize: 11.5, color: faintText }}>WHtR 20 + Strength 15 + Core 15 + Cardio 50 = 100</div>
-          </div>
-
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <button className="af-btn af-btn--pill" type="button" onClick={() => setMobileMode((v) => !v)} title="Toggle mobile-friendly layout">
-              {mobileMode ? "Mobile Mode: ON" : "Mobile Mode: OFF"}
-            </button>
-
-            <div
-              style={{
-                ...cardStyle,
-                padding: "9px 11px",
-                minWidth: isVeryNarrow ? "100%" : 250,
-                textAlign: "center",
-                border: "1px solid rgba(255,255,255,0.12)",
-              }}
-            >
-              <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>TEST PROGRAM</div>
-              <div style={{ marginTop: 7 }}>
-                <select className="af-select" value={program} onChange={(e) => setProgram(e.target.value as TestProgram)} style={selectStyle}>
-                  <option value="PFRA">PFRA (Standard)</option>
-                  <option value="AFSPECWAR_EOD">AFSPECWAR / EOD</option>
-                </select>
-              </div>
-              <div style={{ marginTop: 7, fontSize: 10.5, color: "rgba(255,255,255,0.62)" }}>
-                {isAFSPEC ? "Universal AFSPECWAR/EOD chart (all ages/genders)" : "Age/gender-based PFRA charts"}
-              </div>
-            </div>
-
-            <div
-              style={{
-                background: "rgba(0,0,0,0.22)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 14,
-                padding: "9px 11px",
-                minWidth: isVeryNarrow ? "100%" : 180,
-                textAlign: "center",
-                boxShadow: "0 10px 22px rgba(0,0,0,0.25)",
-              }}
-            >
-              <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>TOTAL</div>
-              <div style={{ fontSize: 34, fontWeight: 950, lineHeight: 1.05, marginTop: 4 }}>{total.toFixed(1)}</div>
-              <div style={{ marginTop: 6, fontSize: 10.5, color: "rgba(255,255,255,0.62)" }}>
-                Prorated · Available max <strong style={{ color: "#fff" }}>{availableMax.toFixed(0)}</strong>
-              </div>
-            </div>
-
-            <div
-              style={{
-                ...cardStyle,
-                padding: "9px 11px",
-                minWidth: isVeryNarrow ? "100%" : 210,
-                textAlign: "center",
-                border: "1px solid rgba(255,255,255,0.12)",
-              }}
-            >
-              <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>STATUS</div>
-              <div style={{ marginTop: 6, display: "flex", justifyContent: "center" }}>
-                <div
-                  style={{
-                    background: badge.bg,
-                    color: badge.fg,
-                    borderRadius: 999,
-                    padding: "6px 10px",
-                    fontSize: 11.5,
-                    fontWeight: 950,
-                    letterSpacing: 0.2,
-                    boxShadow: "0 8px 18px rgba(0,0,0,0.25)",
-                  }}
-                >
-                  {badge.label}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI Row */}
-        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: kpiCols, gap: 8 }}>
-          <div style={kpiCardStyle}>
-            <div style={kpiLabelStyle}>WHtR</div>
-            <div style={kpiValueStyle}>{earnedWHtR.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>
-              {exemptWHtR ? "Exempt" : whtrData.rounded == null ? "—" : `Rounded ${whtrData.rounded.toFixed(2)}`}
-            </div>
-          </div>
-
-          <div style={kpiCardStyle}>
-            <div style={kpiLabelStyle}>STRENGTH</div>
-            <div style={kpiValueStyle}>{earnedStrength.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>{exemptStrength ? "Exempt" : strengthTest === "pushups" ? "Push-ups" : "HRPU"}</div>
-          </div>
-
-          <div style={kpiCardStyle}>
-            <div style={kpiLabelStyle}>CORE</div>
-            <div style={kpiValueStyle}>{earnedCore.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>
-              {exemptCore ? "Exempt" : coreTest === "situps" ? "Sit-ups" : coreTest === "reverse_crunch" ? "Reverse crunch" : "Plank"}
-            </div>
-          </div>
-
-          <div style={kpiCardStyle}>
-            <div style={kpiLabelStyle}>CARDIO</div>
-            <div style={kpiValueStyle}>{earnedCardio.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>{exemptCardio ? "Exempt" : cardioTest === "2mile" ? "2-mile run" : "HAMR"}</div>
-          </div>
-        </div>
-
-        {/* Mobile Jump Bar */}
-        {mobileMode && (
-          <div
-            style={{
-              marginTop: 10,
-              ...cardStyle,
-              padding: 10,
-              background: "rgba(0,0,0,0.18)",
-              border: "1px solid rgba(255,255,255,0.12)",
-            }}
-          >
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
-              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(profileRef)}>
-                Profile
-              </button>
-              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(whtrRef)}>
-                WHtR
-              </button>
-              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(strengthRef)}>
-                Strength
-              </button>
-              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(coreRef)}>
-                Core
-              </button>
-              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(cardioRef)}>
-                Cardio
-              </button>
-              <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(downloadsRef)}>
-                Downloads
-              </button>
-            </div>
-          </div>
-        )}
-
-        {showDiagnostic && (
-          <div
-            style={{
-              marginTop: 10,
-              ...cardStyle,
-              display: "flex",
-              flexDirection: isVeryNarrow ? "column" : "row",
-              justifyContent: "space-between",
-              gap: 10,
-              alignItems: isVeryNarrow ? "flex-start" : "center",
-            }}
-          >
+        <header ref={introRef} className="af-section-anchor" style={{ ...cardStyle, background: "rgba(0,0,0,0.18)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.2fr 0.8fr", gap: 14, alignItems: "center" }}>
             <div>
-              <div style={{ fontWeight: 950, fontSize: 13 }}>DIAGNOSTIC WINDOW</div>
-              <div style={{ fontSize: 11.5, color: faintText, marginTop: 4 }}>
-                Active until <strong>1 Jul 2026</strong>. Verify against official charts; alternatives are member-choice where authorized.
+              <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.15, color: "rgba(255,255,255,0.72)" }}>USAF FITNESS</div>
+              <h1 style={{ margin: "6px 0 8px", fontSize: mobileMode ? 28 : 34, lineHeight: 1.06 }}>USAF PFRA Calculator</h1>
+              <p style={{ margin: 0, color: subtleText, lineHeight: 1.55, fontSize: 15 }}>
+                Free Air Force fitness test calculator for PFRA scoring, AFSPECWAR/EOD standards, waist-to-height ratio,
+                push-ups, hand-release push-ups, sit-ups, reverse crunch, plank, 2-mile run, and HAMR scoring.
+              </p>
+              <p style={{ margin: "10px 0 0", color: faintText, lineHeight: 1.55, fontSize: 13.5 }}>
+                Built to make it easier for Airmen and candidates to estimate component points quickly before checking official
+                charts and local guidance.
+              </p>
+
+              <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(calculatorRef)}>
+                  Jump to calculator
+                </button>
+                <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(downloadsRef)}>
+                  View PDFs
+                </button>
+                <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(faqRef)}>
+                  Read FAQ
+                </button>
               </div>
             </div>
-            <div
-              style={{
-                borderRadius: 999,
-                padding: "7px 10px",
-                fontSize: 11.5,
-                fontWeight: 950,
-                border: "1px solid rgba(255,255,255,0.18)",
-                background: "rgba(255,255,255,0.06)",
-                color: subtleText,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {isAFSPEC ? (
-                <span style={{ color: "#FFF" }}>AFSPECWAR/EOD universal chart</span>
-              ) : (
-                <>
-                  Band: <span style={{ color: "#FFF" }}>{ageBand}</span> · <span style={{ color: "#FFF" }}>{gender === "M" ? "Male" : "Female"}</span>
-                </>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* Exemptions */}
-        <div style={{ marginTop: 10, ...cardStyle }}>
-          <div style={sectionTitleStyle}>
-            <span>Exemptions</span>
-            <span style={sectionTagStyle}>Adjustments</span>
+            <aside style={{ ...cardStyle, padding: 12 }} aria-label="Quick facts">
+              <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>QUICK OVERVIEW</div>
+              <div style={{ marginTop: 8, display: "grid", gap: 8, fontSize: 13.5, color: subtleText }}>
+                <div>WHtR 20 + Strength 15 + Core 15 + Cardio 50 = 100</div>
+                <div>Program toggle for PFRA and AFSPECWAR / EOD</div>
+                <div>Prorated exemptions supported</div>
+                <div>Version {APP_VERSION} · Updated {APP_UPDATED}</div>
+              </div>
+            </aside>
           </div>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {[
-              { label: "WHtR (0–20)", v: exemptWHtR, set: setExemptWHtR },
-              { label: "Strength (0–15)", v: exemptStrength, set: setExemptStrength },
-              { label: "Core (0–15)", v: exemptCore, set: setExemptCore },
-              { label: "Cardio (0–50)", v: exemptCardio, set: setExemptCardio },
-            ].map((x) => (
-              <label
-                key={x.label}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "7px 10px",
-                  borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: "rgba(255,255,255,0.04)",
-                  fontSize: 11.5,
-                  fontWeight: 850,
-                  color: "rgba(255,255,255,0.88)",
-                }}
-              >
-                <input type="checkbox" checked={x.v} onChange={(e) => x.set(e.target.checked)} style={{ transform: "scale(1.05)" }} />
-                Exempt: {x.label}
-              </label>
+          <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {seoKeywords.map((word) => (
+              <span key={word} style={{ ...sectionTagStyle, fontSize: 10.5 }}>
+                {word}
+              </span>
             ))}
           </div>
+        </header>
 
-          <div style={{ marginTop: 10, fontSize: 11.5, color: "rgba(255,255,255,0.70)" }}>
-            Prorated automatically · Available max: <strong style={{ color: "#fff" }}>{availableMax.toFixed(0)}</strong> · Earned:{" "}
-            <strong style={{ color: "#fff" }}>{earnedTotal.toFixed(1)}</strong>
+        <section style={{ marginTop: 12, display: "grid", gridTemplateColumns: gridCols, gap: 10 }} aria-label="Summary metrics">
+          <div style={kpiCardStyle}>
+            <div style={{ fontSize: 11.5, color: faintText, fontWeight: 850 }}>WHtR</div>
+            <div style={{ fontSize: 28, fontWeight: 950 }}>{earnedWHtR.toFixed(1)}</div>
+            <div style={{ fontSize: 11, color: faintText }}>{exemptWHtR ? "Exempt" : whtrData.rounded == null ? "—" : `Rounded ${whtrData.rounded.toFixed(2)}`}</div>
           </div>
-        </div>
-
-        <div style={{ marginTop: 12, height: 1, background: "rgba(255,255,255,0.10)" }} />
-
-        {/* Main Grid */}
-        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: gridCols, gap: 10, alignItems: "stretch" }}>
-          {/* Column 1 */}
-          <div style={{ display: "grid", gap: 10 }}>
-            <div ref={profileRef} style={cardStyle}>
-              <div style={sectionTitleStyle}>
-                <span>Profile</span>
-                <span style={sectionTagStyle}>Inputs</span>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: mobileMode || isVeryNarrow ? "1fr" : "1fr 1fr", gap: 10 }}>
-                <div>
-                  <div style={labelStyle}>Exact Age</div>
-                  <input value={age} onChange={(e) => setAge(e.target.value)} inputMode="numeric" placeholder="e.g., 27" style={inputStyle} />
-                  <div style={{ fontSize: 11.5, marginTop: 8, color: faintText }}>
-                    Band: <strong style={{ color: "#FFF" }}>{ageBand}</strong>
-                    {isAFSPEC && <span style={{ marginLeft: 8, color: "rgba(255,255,255,0.62)" }}>(Age N/A)</span>}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={labelStyle}>Gender</div>
-                  <select
-                    className="af-select"
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value as Gender)}
-                    style={selectStyle}
-                    disabled={isAFSPEC}
-                    title={isAFSPEC ? "AFSPECWAR/EOD chart is universal (gender not used)" : ""}
-                  >
-                    <option value="M">Male</option>
-                    <option value="F">Female</option>
-                  </select>
-                  {isAFSPEC && <div style={{ marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.62)" }}>Gender N/A</div>}
-                </div>
-              </div>
-            </div>
-
-            <div ref={whtrRef} style={{ ...cardStyle, ...disabledCard(exemptWHtR) }}>
-              <div style={sectionTitleStyle}>
-                <span>WHtR (0–20)</span>
-                <span style={sectionTagStyle}>Body Comp</span>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: mobileMode || isVeryNarrow ? "1fr" : "1fr 1fr", gap: 10 }}>
-                <div>
-                  <div style={labelStyle}>Height</div>
-                  <input
-                    value={height}
-                    onChange={(e) => setHeight(e.target.value)}
-                    inputMode="decimal"
-                    placeholder="e.g., 68"
-                    style={inputStyle}
-                    disabled={exemptWHtR}
-                  />
-                </div>
-                <div>
-                  <div style={labelStyle}>Waist</div>
-                  <input
-                    value={waist}
-                    onChange={(e) => setWaist(e.target.value)}
-                    inputMode="decimal"
-                    placeholder="e.g., 38"
-                    style={inputStyle}
-                    disabled={exemptWHtR}
-                  />
-                </div>
-              </div>
-
-              <div
+          <div style={kpiCardStyle}>
+            <div style={{ fontSize: 11.5, color: faintText, fontWeight: 850 }}>STRENGTH</div>
+            <div style={{ fontSize: 28, fontWeight: 950 }}>{earnedStrength.toFixed(1)}</div>
+            <div style={{ fontSize: 11, color: faintText }}>{exemptStrength ? "Exempt" : strengthTest === "pushups" ? "Push-ups" : "HRPU"}</div>
+          </div>
+          <div style={kpiCardStyle}>
+            <div style={{ fontSize: 11.5, color: faintText, fontWeight: 850 }}>CORE</div>
+            <div style={{ fontSize: 28, fontWeight: 950 }}>{earnedCore.toFixed(1)}</div>
+            <div style={{ fontSize: 11, color: faintText }}>{exemptCore ? "Exempt" : coreTest === "situps" ? "Sit-ups" : coreTest === "reverse_crunch" ? "Reverse crunch" : "Plank"}</div>
+          </div>
+          <div style={kpiCardStyle}>
+            <div style={{ fontSize: 11.5, color: faintText, fontWeight: 850 }}>TOTAL</div>
+            <div style={{ fontSize: 28, fontWeight: 950 }}>{total.toFixed(1)}</div>
+            <div style={{ marginTop: 2 }}>
+              <span
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: mobileMode ? "1fr" : isVeryNarrow ? "1fr" : "1fr 1fr 1fr",
-                  gap: 8,
-                  marginTop: 10,
+                  background: badge.bg,
+                  color: badge.fg,
+                  borderRadius: 999,
+                  padding: "4px 9px",
+                  fontSize: 11,
+                  fontWeight: 950,
                 }}
               >
-                <div style={{ fontSize: 11.5, color: faintText }}>
-                  Raw: <strong style={{ color: "#FFF" }}>{exemptWHtR ? "—" : whtrData.raw == null ? "—" : whtrData.raw.toFixed(4)}</strong>
-                </div>
-                <div style={{ fontSize: 11.5, color: faintText }}>
-                  Rounded: <strong style={{ color: "#FFF" }}>{exemptWHtR ? "—" : whtrData.rounded == null ? "—" : whtrData.rounded.toFixed(2)}</strong>
-                </div>
-                <div style={{ fontSize: 11.5, color: faintText }}>
-                  Points: <strong style={{ color: "#FFF" }}>{earnedWHtR.toFixed(1)}</strong>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 8, fontSize: 10.5, color: "rgba(255,255,255,0.60)" }}>
-                Use the same unit for height and waist (both inches or both cm).
-              </div>
+                {badge.label}
+              </span>
             </div>
           </div>
+        </section>
 
-          {/* Column 2 */}
-          <div style={{ display: "grid", gap: 10 }}>
-            <div ref={strengthRef} style={{ ...cardStyle, ...disabledCard(exemptStrength) }}>
-              <div style={sectionTitleStyle}>
-                <span>Strength (0–15)</span>
-                <span style={sectionTagStyle}>Muscular</span>
-              </div>
+        {showDiagnostic && (
+          <section style={{ marginTop: 12, ...cardStyle }} aria-label="Diagnostic notice">
+            <div style={{ fontWeight: 950, fontSize: 13.5 }}>Diagnostic window notice</div>
+            <div style={{ marginTop: 6, color: faintText, fontSize: 12.5 }}>
+              Active until <strong style={{ color: "#fff" }}>1 Jul 2026</strong>. Continue verifying official scoring,
+              exemptions, and unit policy.
+            </div>
+          </section>
+        )}
 
-              <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.3fr 1fr", gap: 10 }}>
+        <section ref={calculatorRef} className="af-section-anchor" style={{ marginTop: 12, ...cardStyle }} aria-labelledby="calculator-heading">
+          <div style={sectionTitleStyle}>
+            <h2 id="calculator-heading" style={{ margin: 0, fontSize: 20 }}>Air Force Fitness Score Calculator</h2>
+            <span style={sectionTagStyle}>Calculator</span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: mainCols, gap: 12 }}>
+            <div style={{ display: "grid", gap: 12 }}>
+              <section style={cardStyle} aria-labelledby="program-profile-heading">
+                <div style={sectionTitleStyle}>
+                  <h3 id="program-profile-heading" style={{ margin: 0, fontSize: 16 }}>Program & profile</h3>
+                  <span style={sectionTagStyle}>Inputs</span>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <div style={labelStyle}>Test program</div>
+                    <select className="af-select" value={program} onChange={(e) => setProgram(e.target.value as TestProgram)} style={selectStyle}>
+                      <option value="PFRA">PFRA (Standard)</option>
+                      <option value="AFSPECWAR_EOD">AFSPECWAR / EOD</option>
+                    </select>
+                    <div style={{ marginTop: 8, fontSize: 11, color: faintText }}>
+                      {isAFSPEC ? "Universal AFSPECWAR/EOD chart for all ages and genders" : "Age and gender based PFRA scoring"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={labelStyle}>Exact age</div>
+                    <input value={age} onChange={(e) => setAge(e.target.value)} inputMode="numeric" placeholder="e.g., 27" style={inputStyle} />
+                    <div style={{ marginTop: 8, fontSize: 11, color: faintText }}>
+                      Age band: <strong style={{ color: "#fff" }}>{ageBand}</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={labelStyle}>Gender</div>
+                    <select
+                      className="af-select"
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value as Gender)}
+                      style={selectStyle}
+                      disabled={isAFSPEC}
+                    >
+                      <option value="M">Male</option>
+                      <option value="F">Female</option>
+                    </select>
+                    {isAFSPEC && <div style={{ marginTop: 8, fontSize: 11, color: faintText }}>Not used for the universal AFSPECWAR/EOD chart</div>}
+                  </div>
+
+                  <div>
+                    <div style={labelStyle}>Mobile layout</div>
+                    <button className="af-btn" type="button" onClick={() => setMobileMode((v) => !v)} style={{ width: "100%" }}>
+                      {mobileMode ? "Mobile Mode: ON" : "Mobile Mode: OFF"}
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              <section style={{ ...cardStyle, opacity: exemptWHtR ? 0.65 : 1 }} aria-labelledby="whtr-heading">
+                <div style={sectionTitleStyle}>
+                  <h3 id="whtr-heading" style={{ margin: 0, fontSize: 16 }}>Waist-to-height ratio (0–20)</h3>
+                  <span style={sectionTagStyle}>Body comp</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <div style={labelStyle}>Height</div>
+                    <input value={height} onChange={(e) => setHeight(e.target.value)} inputMode="decimal" placeholder="e.g., 68" style={inputStyle} disabled={exemptWHtR} />
+                  </div>
+                  <div>
+                    <div style={labelStyle}>Waist</div>
+                    <input value={waist} onChange={(e) => setWaist(e.target.value)} inputMode="decimal" placeholder="e.g., 38" style={inputStyle} disabled={exemptWHtR} />
+                  </div>
+                </div>
+                <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "repeat(3, 1fr)", gap: 8, fontSize: 12, color: faintText }}>
+                  <div>Raw: <strong style={{ color: "#fff" }}>{whtrData.raw == null || exemptWHtR ? "—" : whtrData.raw.toFixed(4)}</strong></div>
+                  <div>Rounded: <strong style={{ color: "#fff" }}>{whtrData.rounded == null || exemptWHtR ? "—" : whtrData.rounded.toFixed(2)}</strong></div>
+                  <div>Points: <strong style={{ color: "#fff" }}>{earnedWHtR.toFixed(1)}</strong></div>
+                </div>
+                <div style={{ marginTop: 8, fontSize: 11, color: faintText }}>Use the same unit for height and waist.</div>
+              </section>
+            </div>
+
+            <div style={{ display: "grid", gap: 12 }}>
+              <section style={{ ...cardStyle, opacity: exemptStrength ? 0.65 : 1 }} aria-labelledby="strength-heading">
+                <div style={sectionTitleStyle}>
+                  <h3 id="strength-heading" style={{ margin: 0, fontSize: 16 }}>Strength (0–15)</h3>
+                  <span style={sectionTagStyle}>Muscular</span>
+                </div>
                 <div>
                   <div style={labelStyle}>Test</div>
-                  <select
-                    className="af-select"
-                    value={strengthTest}
-                    onChange={(e) => setStrengthTest(e.target.value as StrengthTest)}
-                    style={selectStyle}
-                    disabled={exemptStrength}
-                  >
+                  <select className="af-select" value={strengthTest} onChange={(e) => setStrengthTest(e.target.value as StrengthTest)} style={selectStyle} disabled={exemptStrength}>
                     <option value="pushups">Push-ups</option>
                     <option value="hrpu">Hand-release push-ups</option>
                   </select>
                 </div>
-
-                {!mobileMode && (
-                  <div>
-                    <div style={labelStyle}>Points</div>
-                    <div style={{ fontSize: 24, fontWeight: 950, paddingTop: 4 }}>{earnedStrength.toFixed(1)}</div>
-                  </div>
-                )}
-              </div>
-
-              {mobileMode && (
-                <div style={{ marginTop: 8, fontSize: 12, color: faintText }}>
-                  Points: <strong style={{ color: "#FFF" }}>{earnedStrength.toFixed(1)}</strong>
+                <div style={{ marginTop: 10 }}>
+                  <div style={labelStyle}>{strengthTest === "pushups" ? "Push-ups (reps)" : "Hand-release push-ups (reps)"}</div>
+                  <input
+                    value={strengthTest === "pushups" ? pushupReps : hrpuReps}
+                    onChange={(e) => (strengthTest === "pushups" ? setPushupReps(e.target.value) : setHrpuReps(e.target.value))}
+                    inputMode="numeric"
+                    placeholder="e.g., 45"
+                    style={inputStyle}
+                    disabled={exemptStrength}
+                  />
                 </div>
-              )}
+                <div style={{ marginTop: 10, fontSize: 13, color: subtleText }}>Points: <strong style={{ color: "#fff" }}>{earnedStrength.toFixed(1)}</strong></div>
+              </section>
 
-              <div style={{ marginTop: 10 }}>
-                <div style={labelStyle}>{strengthTest === "pushups" ? "Push-ups (reps)" : "HRPU (reps)"}</div>
-                <input
-                  value={strengthTest === "pushups" ? pushupReps : hrpuReps}
-                  onChange={(e) => (strengthTest === "pushups" ? setPushupReps(e.target.value) : setHrpuReps(e.target.value))}
-                  inputMode="numeric"
-                  placeholder="e.g., 45"
-                  style={inputStyle}
-                  disabled={exemptStrength}
-                />
-              </div>
-            </div>
-
-            <div ref={coreRef} style={{ ...cardStyle, ...disabledCard(exemptCore) }}>
-              <div style={sectionTitleStyle}>
-                <span>Core (0–15)</span>
-                <span style={sectionTagStyle}>Stability</span>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.3fr 1fr", gap: 10 }}>
+              <section style={{ ...cardStyle, opacity: exemptCore ? 0.65 : 1 }} aria-labelledby="core-heading">
+                <div style={sectionTitleStyle}>
+                  <h3 id="core-heading" style={{ margin: 0, fontSize: 16 }}>Core (0–15)</h3>
+                  <span style={sectionTagStyle}>Stability</span>
+                </div>
                 <div>
                   <div style={labelStyle}>Test</div>
-                  <select
-                    className="af-select"
-                    value={coreTest}
-                    onChange={(e) => setCoreTest(e.target.value as CoreTest)}
-                    style={selectStyle}
-                    disabled={exemptCore}
-                  >
+                  <select className="af-select" value={coreTest} onChange={(e) => setCoreTest(e.target.value as CoreTest)} style={selectStyle} disabled={exemptCore}>
                     <option value="situps">Sit-ups</option>
                     <option value="reverse_crunch">Cross-leg reverse crunch</option>
                     <option value="plank">Forearm plank (mm:ss)</option>
                   </select>
                 </div>
-
-                {!mobileMode && (
-                  <div>
-                    <div style={labelStyle}>Points</div>
-                    <div style={{ fontSize: 24, fontWeight: 950, paddingTop: 4 }}>{earnedCore.toFixed(1)}</div>
-                  </div>
-                )}
-              </div>
-
-              {mobileMode && (
-                <div style={{ marginTop: 8, fontSize: 12, color: faintText }}>
-                  Points: <strong style={{ color: "#FFF" }}>{earnedCore.toFixed(1)}</strong>
+                <div style={{ marginTop: 10 }}>
+                  <div style={labelStyle}>{coreTest === "situps" ? "Sit-ups (reps)" : coreTest === "reverse_crunch" ? "Reverse crunch (reps)" : "Plank (mm:ss)"}</div>
+                  <input
+                    value={coreTest === "situps" ? situpReps : coreTest === "reverse_crunch" ? reverseCrunchReps : plankTime}
+                    onChange={(e) =>
+                      coreTest === "situps"
+                        ? setSitupReps(e.target.value)
+                        : coreTest === "reverse_crunch"
+                        ? setReverseCrunchReps(e.target.value)
+                        : setPlankTime(e.target.value)
+                    }
+                    inputMode={coreTest === "plank" ? "text" : "numeric"}
+                    placeholder={coreTest === "plank" ? "e.g., 2:30" : "e.g., 45"}
+                    style={inputStyle}
+                    disabled={exemptCore}
+                  />
                 </div>
-              )}
-
-              <div style={{ marginTop: 10 }}>
-                <div style={labelStyle}>
-                  {coreTest === "situps" ? "Sit-ups (reps)" : coreTest === "reverse_crunch" ? "Reverse crunch (reps)" : "Plank (mm:ss)"}
-                </div>
-                <input
-                  value={coreTest === "situps" ? situpReps : coreTest === "reverse_crunch" ? reverseCrunchReps : plankTime}
-                  onChange={(e) =>
-                    coreTest === "situps"
-                      ? setSitupReps(e.target.value)
-                      : coreTest === "reverse_crunch"
-                      ? setReverseCrunchReps(e.target.value)
-                      : setPlankTime(e.target.value)
-                  }
-                  inputMode={coreTest === "plank" ? "text" : "numeric"}
-                  placeholder={coreTest === "plank" ? "e.g., 2:30" : "e.g., 45"}
-                  style={inputStyle}
-                  disabled={exemptCore}
-                />
-              </div>
+                <div style={{ marginTop: 10, fontSize: 13, color: subtleText }}>Points: <strong style={{ color: "#fff" }}>{earnedCore.toFixed(1)}</strong></div>
+              </section>
             </div>
-          </div>
 
-          {/* Column 3 */}
-          <div style={{ display: "grid", gap: 10 }}>
-            <div ref={cardioRef} style={{ ...cardStyle, ...disabledCard(exemptCardio) }}>
-              <div style={sectionTitleStyle}>
-                <span>Cardio (0–50)</span>
-                <span style={sectionTagStyle}>Aerobic</span>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.3fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gap: 12 }}>
+              <section style={{ ...cardStyle, opacity: exemptCardio ? 0.65 : 1 }} aria-labelledby="cardio-heading">
+                <div style={sectionTitleStyle}>
+                  <h3 id="cardio-heading" style={{ margin: 0, fontSize: 16 }}>Cardio (0–50)</h3>
+                  <span style={sectionTagStyle}>Aerobic</span>
+                </div>
                 <div>
                   <div style={labelStyle}>Test</div>
-                  <select
-                    className="af-select"
-                    value={cardioTest}
-                    onChange={(e) => setCardioTest(e.target.value as CardioTest)}
-                    style={selectStyle}
-                    disabled={exemptCardio}
-                  >
+                  <select className="af-select" value={cardioTest} onChange={(e) => setCardioTest(e.target.value as CardioTest)} style={selectStyle} disabled={exemptCardio}>
                     <option value="2mile">2-mile run (mm:ss)</option>
                     <option value="hamr">20m HAMR (shuttles)</option>
                   </select>
                 </div>
-
-                {!mobileMode && (
-                  <div>
-                    <div style={labelStyle}>Points</div>
-                    <div style={{ fontSize: 24, fontWeight: 950, paddingTop: 4 }}>{earnedCardio.toFixed(1)}</div>
-                  </div>
-                )}
-              </div>
-
-              {mobileMode && (
-                <div style={{ marginTop: 8, fontSize: 12, color: faintText }}>
-                  Points: <strong style={{ color: "#FFF" }}>{earnedCardio.toFixed(1)}</strong>
+                <div style={{ marginTop: 10 }}>
+                  <div style={labelStyle}>{cardioTest === "2mile" ? "2-mile time (mm:ss)" : "HAMR shuttles (count)"}</div>
+                  <input
+                    value={cardioTest === "2mile" ? run2MileTime : hamrShuttles}
+                    onChange={(e) => (cardioTest === "2mile" ? setRun2MileTime(e.target.value) : setHamrShuttles(e.target.value))}
+                    inputMode={cardioTest === "2mile" ? "text" : "numeric"}
+                    placeholder={cardioTest === "2mile" ? "e.g., 16:54" : "e.g., 60"}
+                    style={inputStyle}
+                    disabled={exemptCardio}
+                  />
                 </div>
-              )}
+                <div style={{ marginTop: 10, fontSize: 13, color: subtleText }}>Points: <strong style={{ color: "#fff" }}>{earnedCardio.toFixed(1)}</strong></div>
+              </section>
 
-              <div style={{ marginTop: 10 }}>
-                <div style={labelStyle}>{cardioTest === "2mile" ? "2-mile time (mm:ss)" : "HAMR shuttles (count)"}</div>
-                <input
-                  value={cardioTest === "2mile" ? run2MileTime : hamrShuttles}
-                  onChange={(e) => (cardioTest === "2mile" ? setRun2MileTime(e.target.value) : setHamrShuttles(e.target.value))}
-                  inputMode={cardioTest === "2mile" ? "text" : "numeric"}
-                  placeholder={cardioTest === "2mile" ? "e.g., 16:54" : "e.g., 60"}
-                  style={inputStyle}
-                  disabled={exemptCardio}
-                />
-              </div>
-            </div>
-
-            <div style={cardStyle}>
-              <div style={sectionTitleStyle}>
-                <span>Breakdown</span>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  {mobileMode && (
-                    <button className="af-btn af-btn--pill" type="button" onClick={() => setShowBreakdown((v) => !v)}>
-                      {showBreakdown ? "Hide" : "Show"}
-                    </button>
-                  )}
+              <section style={cardStyle} aria-labelledby="breakdown-heading">
+                <div style={sectionTitleStyle}>
+                  <h3 id="breakdown-heading" style={{ margin: 0, fontSize: 16 }}>Breakdown</h3>
                   <span style={sectionTagStyle}>Summary</span>
                 </div>
-              </div>
-
-              {!mobileMode || showBreakdown ? (
-                <div style={{ display: "grid", gap: 7 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
-                    <span>WHtR</span>
-                    <strong style={{ color: "#FFF" }}>{earnedWHtR.toFixed(1)}</strong>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
-                    <span>Strength</span>
-                    <strong style={{ color: "#FFF" }}>{earnedStrength.toFixed(1)}</strong>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
-                    <span>Core</span>
-                    <strong style={{ color: "#FFF" }}>{earnedCore.toFixed(1)}</strong>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", color: subtleText }}>
-                    <span>Cardio</span>
-                    <strong style={{ color: "#FFF" }}>{earnedCardio.toFixed(1)}</strong>
-                  </div>
-
-                  <div
-                    style={{
-                      borderTop: "1px solid rgba(255,255,255,0.10)",
-                      marginTop: 6,
-                      paddingTop: 10,
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}
-                  >
+                <div style={{ display: "grid", gap: 8, color: subtleText, fontSize: 13 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>WHtR</span><strong style={{ color: "#fff" }}>{earnedWHtR.toFixed(1)}</strong></div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>Strength</span><strong style={{ color: "#fff" }}>{earnedStrength.toFixed(1)}</strong></div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>Core</span><strong style={{ color: "#fff" }}>{earnedCore.toFixed(1)}</strong></div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>Cardio</span><strong style={{ color: "#fff" }}>{earnedCardio.toFixed(1)}</strong></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.12)", paddingTop: 10, marginTop: 2 }}>
                     <span style={{ fontWeight: 950 }}>Total</span>
-                    <span style={{ fontWeight: 950, fontSize: 17 }}>{total.toFixed(1)}</span>
+                    <strong style={{ color: "#fff", fontSize: 17 }}>{total.toFixed(1)}</strong>
                   </div>
-
-                  <div style={{ fontSize: 10.5, color: faintText, marginTop: 6 }}>
-                    Tip: Use <strong style={{ color: "#FFF" }}>Tab</strong> to move between fields quickly.
-                  </div>
+                  <div style={{ fontSize: 11.5, color: faintText }}>Available max: <strong style={{ color: "#fff" }}>{availableMax.toFixed(0)}</strong> · Earned: <strong style={{ color: "#fff" }}>{earnedTotal.toFixed(1)}</strong></div>
                 </div>
-              ) : (
-                <div style={{ fontSize: 11.5, color: faintText }}>Tap “Show” to view component totals.</div>
-              )}
+              </section>
             </div>
           </div>
-        </div>
 
-        {/* Downloads */}
-        <div style={{ marginTop: 14, height: 1, background: "rgba(255,255,255,0.10)" }} />
-
-        <div
-          ref={downloadsRef}
-          style={{
-            ...cardStyle,
-            marginTop: 10,
-            padding: 12,
-            background: "rgba(8, 18, 38, 0.62)",
-            border: "1px solid rgba(255,255,255,0.10)",
-          }}
-        >
-          <div style={{ ...sectionTitleStyle, marginBottom: 10, fontSize: 13.5 }}>
-            <span>Downloads</span>
-            <span style={{ ...sectionTagStyle, fontSize: 10, padding: "3px 8px" }}>PDF</span>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isVeryNarrow ? "1fr" : isNarrow ? "1fr 1fr" : "repeat(3, minmax(220px, 320px))",
-                gap: 10,
-                alignItems: "stretch",
-                width: "100%",
-                maxWidth: isVeryNarrow ? "100%" : isNarrow ? 820 : 1040,
-              }}
-            >
-              {ATTACHMENTS.map((a) => (
-                <AttachmentTile
-                  key={a.url}
-                  title={a.title}
-                  subtitle={a.subtitle}
-                  url={a.url}
-                  filename={a.filename}
-                  isVeryNarrow={isVeryNarrow}
-                  onDownloaded={(fn) => showToast(`✅ Downloaded: ${fn}`, "ok")}
-                  onDownloadFailed={(detail) => showToast(`Download failed. ${detail ? `(${detail})` : ""}`, "err")}
-                />
+          <section style={{ marginTop: 12, ...cardStyle }} aria-labelledby="exemptions-heading">
+            <div style={sectionTitleStyle}>
+              <h3 id="exemptions-heading" style={{ margin: 0, fontSize: 16 }}>Exemptions</h3>
+              <span style={sectionTagStyle}>Prorated</span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {[
+                { label: "WHtR (0–20)", v: exemptWHtR, set: setExemptWHtR },
+                { label: "Strength (0–15)", v: exemptStrength, set: setExemptStrength },
+                { label: "Core (0–15)", v: exemptCore, set: setExemptCore },
+                { label: "Cardio (0–50)", v: exemptCardio, set: setExemptCardio },
+              ].map((x) => (
+                <label
+                  key={x.label}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 10px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "rgba(255,255,255,0.04)",
+                    fontSize: 12,
+                    fontWeight: 850,
+                  }}
+                >
+                  <input type="checkbox" checked={x.v} onChange={(e) => x.set(e.target.checked)} />
+                  Exempt: {x.label}
+                </label>
               ))}
             </div>
+          </section>
+        </section>
+
+        <section style={{ marginTop: 12, ...cardStyle }} aria-labelledby="about-heading">
+          <div style={sectionTitleStyle}>
+            <h2 id="about-heading" style={{ margin: 0, fontSize: 20 }}>How this PFRA calculator helps people find the right score faster</h2>
+            <span style={sectionTagStyle}>Overview</span>
           </div>
-        </div>
+          <div style={{ display: "grid", gap: 10, color: subtleText, lineHeight: 1.6, fontSize: 14 }}>
+            <p style={{ margin: 0 }}>
+              This page is designed for people searching for a <strong style={{ color: "#fff" }}>USAF PFRA calculator</strong>,
+              an <strong style={{ color: "#fff" }}>Air Force fitness calculator</strong>, an
+              <strong style={{ color: "#fff" }}> Air Force PT score calculator</strong>, or a quick way to estimate points for
+              waist-to-height ratio, push-ups, hand-release push-ups, sit-ups, reverse crunch, plank, 2-mile run, and HAMR.
+            </p>
+            <p style={{ margin: 0 }}>
+              It also supports <strong style={{ color: "#fff" }}>AFSPECWAR / EOD scoring</strong> with the universal chart,
+              which makes the page relevant for users looking for AFSPECWAR fitness standards, EOD fitness score estimates,
+              and PFRA scoring chart references in one place.
+            </p>
+            <p style={{ margin: 0 }}>
+              Download links to the playbook, PFRA scoring charts, and DAFMAN reference PDFs are included below so visitors can
+              compare calculator output against source documents quickly.
+            </p>
+          </div>
+        </section>
 
-        {/* Footer */}
-        <div style={{ marginTop: 14, height: 1, background: "rgba(255,255,255,0.10)" }} />
+        <section ref={downloadsRef} className="af-section-anchor" style={{ marginTop: 12, ...cardStyle }} aria-labelledby="downloads-heading">
+          <div style={sectionTitleStyle}>
+            <h2 id="downloads-heading" style={{ margin: 0, fontSize: 20 }}>Official reference downloads</h2>
+            <span style={sectionTagStyle}>PDF</span>
+          </div>
+          <p style={{ marginTop: 0, marginBottom: 12, color: faintText, lineHeight: 1.55 }}>
+            These reference files help users confirm Air Force fitness scoring details and give search engines more context about
+            the page topic through clearly labeled resource links.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: isVeryNarrow ? "1fr" : isNarrow ? "1fr 1fr" : "repeat(3, minmax(220px, 1fr))", gap: 10 }}>
+            {ATTACHMENTS.map((a) => (
+              <AttachmentTile
+                key={a.url}
+                title={a.title}
+                subtitle={a.subtitle}
+                url={a.url}
+                filename={a.filename}
+                isVeryNarrow={isVeryNarrow}
+                onDownloaded={(fn) => showToast(`✅ Downloaded: ${fn}`, "ok")}
+                onDownloadFailed={(detail) => showToast(`Download failed. ${detail ? `(${detail})` : ""}`, "err")}
+              />
+            ))}
+          </div>
+        </section>
 
-        <div style={{ marginTop: 10, paddingTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
-          <img src="/branding/usaf_wings_transparent_refined.png" alt="USAF Wings" style={{ height: 32, width: "auto", opacity: 0.95 }} />
-          <img src="/branding/us_air_force_text_transparent.png" alt="U.S. Air Force" style={{ height: 15, width: "auto", opacity: 0.9 }} />
-        </div>
+        <section ref={faqRef} className="af-section-anchor" style={{ marginTop: 12, ...cardStyle }} aria-labelledby="faq-heading">
+          <div style={sectionTitleStyle}>
+            <h2 id="faq-heading" style={{ margin: 0, fontSize: 20 }}>Frequently asked questions</h2>
+            <span style={sectionTagStyle}>FAQ</span>
+          </div>
+          <div style={{ display: "grid", gap: 10 }}>
+            <div>
+              <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>What does this USAF PFRA calculator estimate?</h3>
+              <p style={{ margin: 0, color: subtleText, lineHeight: 1.55 }}>
+                It estimates PFRA component points for body composition, strength, core, cardio, exemptions, and overall score.
+                It also includes the AFSPECWAR / EOD universal scoring option.
+              </p>
+            </div>
+            <div>
+              <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>Can I use it for the 2-mile run and the HAMR?</h3>
+              <p style={{ margin: 0, color: subtleText, lineHeight: 1.55 }}>
+                Yes. Choose either the 2-mile run time or the 20-meter HAMR shuttle count in the cardio section.
+              </p>
+            </div>
+            <div>
+              <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>Does this replace official Air Force guidance?</h3>
+              <p style={{ margin: 0, color: subtleText, lineHeight: 1.55 }}>
+                No. This is a quick estimation tool. Users should still verify current scoring, exemptions, and local policy with
+                official guidance.
+              </p>
+            </div>
+          </div>
+        </section>
 
-        <div style={{ textAlign: "center", marginTop: 6, fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
-          PFRA Calculator • Powered by Fingers
-        </div>
+        <footer style={{ marginTop: 14, paddingTop: 10, textAlign: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, flexWrap: "wrap" }}>
+            <img src="/branding/usaf_wings_transparent_refined.png" alt="U.S. Air Force wings graphic" style={{ height: 34, width: "auto", opacity: 0.95 }} />
+            <img src="/branding/us_air_force_text_transparent.png" alt="U.S. Air Force text logo" style={{ height: 15, width: "auto", opacity: 0.9 }} />
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11.5, color: "rgba(255,255,255,0.60)" }}>PFRA Calculator • Powered by Fingers</div>
+          <div style={{ marginTop: 6, fontSize: 10.8, color: "rgba(255,255,255,0.60)", lineHeight: 1.45 }}>
+            Always verify scoring, exemptions, and program requirements against current official guidance and local unit policy.
+          </div>
+        </footer>
 
-        <div style={{ textAlign: "center", marginTop: 6, fontSize: 10.8, color: "rgba(255,255,255,0.60)", lineHeight: 1.35 }}>
-          Always verify scoring, exemptions, and program requirements against current official guidance and local unit policy
-        </div>
-      </div>
+        <noscript>
+          <div style={{ marginTop: 12, color: "#fff" }}>
+            JavaScript is required for the interactive Air Force PFRA calculator, but the page still describes PFRA scoring,
+            AFSPECWAR/EOD scoring, and the linked reference PDFs.
+          </div>
+        </noscript>
+      </main>
 
       {toast && (
         <div
@@ -1377,7 +1143,6 @@ export default function App() {
             color: "#fff",
             fontWeight: 900,
             fontSize: 12,
-            letterSpacing: 0.2,
             boxShadow: "0 12px 28px rgba(0,0,0,0.35)",
             zIndex: 9999,
             maxWidth: "92vw",
