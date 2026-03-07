@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import pushups from "./data/strength_pushups.json";
 import hrpu from "./data/strength_hrpu.json";
@@ -21,6 +21,12 @@ type MetaOptions = {
   name?: string;
   property?: string;
   content: string;
+};
+
+type BandStyle = {
+  bg: string;
+  fg: string;
+  border: string;
 };
 
 function parseNumber(s: string): number | null {
@@ -84,16 +90,21 @@ function lookupMaxTimePointsPFRA(table: any, ageBand: string, gender: Gender, ti
   return 0;
 }
 
-function scoreColor(total: number): { bg: string; fg: string; label: string } {
-  if (total >= 90) return { bg: "#0A7A2F", fg: "#FFFFFF", label: "EXCELLENT (≥ 90)" };
-  if (total >= 75) return { bg: "#F2C200", fg: "#111111", label: "SATISFACTORY (75–89.9)" };
-  return { bg: "#B00020", fg: "#FFFFFF", label: "FAIL (< 75)" };
+function getBandStyle(percent: number): BandStyle {
+  if (percent < 75) {
+    return { bg: "rgba(153, 27, 27, 0.90)", fg: "#FFFFFF", border: "rgba(254, 202, 202, 0.28)" };
+  }
+  if (percent < 80) {
+    return { bg: "rgba(180, 83, 9, 0.92)", fg: "#FFFFFF", border: "rgba(253, 230, 138, 0.28)" };
+  }
+  if (percent < 90) {
+    return { bg: "rgba(250, 204, 21, 0.95)", fg: "#161616", border: "rgba(255, 255, 255, 0.24)" };
+  }
+  return { bg: "rgba(21, 128, 61, 0.92)", fg: "#FFFFFF", border: "rgba(187, 247, 208, 0.26)" };
 }
 
-function isDiagnosticWindow(): boolean {
-  const now = new Date();
-  const cutoff = new Date(2026, 6, 1, 0, 0, 0, 0);
-  return now < cutoff;
+function formatPercent(value: number): string {
+  return `${value.toFixed(1)}%`;
 }
 
 function upsertMetaTag({ name, property, content }: MetaOptions) {
@@ -206,6 +217,40 @@ function AttachmentTile(props: {
   );
 }
 
+function ScoreCard(props: {
+  title: string;
+  points: number;
+  maxPoints: number;
+  descriptor: string;
+  exempt?: boolean;
+}) {
+  const { title, points, maxPoints, descriptor, exempt = false } = props;
+  const pct = exempt || maxPoints <= 0 ? 0 : (points / maxPoints) * 100;
+  const band = getBandStyle(pct);
+
+  return (
+    <div
+      style={{
+        borderRadius: 16,
+        padding: 14,
+        background: band.bg,
+        color: band.fg,
+        border: `1px solid ${band.border}`,
+        boxShadow: "0 10px 24px rgba(0,0,0,0.20)",
+        minHeight: 116,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      <div style={{ fontSize: 11.5, fontWeight: 900, opacity: 0.86, letterSpacing: 0.8, textTransform: "uppercase" }}>{title}</div>
+      <div style={{ fontSize: 30, fontWeight: 950, lineHeight: 1 }}>{points.toFixed(1)}</div>
+      <div style={{ fontSize: 14, fontWeight: 900 }}>{exempt ? "Exempt" : formatPercent(pct)}</div>
+      <div style={{ fontSize: 11.5, opacity: 0.9 }}>{descriptor}</div>
+    </div>
+  );
+}
+
 const AFSPEC_STRENGTH_CORE: Array<{
   pts: number;
   pushups: number;
@@ -303,30 +348,38 @@ function lookupAFSPECHamrPoints(shuttles: number): number {
 }
 
 export default function App() {
-  const APP_VERSION = "1.1.0";
+  const APP_VERSION = "1.3.0";
   const APP_UPDATED = "2026-03-07";
   const SITE_URL = "https://usafpfracalculator.com";
-  const PAGE_TITLE = "USAF PFRA Calculator | Air Force Fitness Test Score Calculator";
+  const PAGE_TITLE = "USAF PFRA Calculator | Air Force PT Test, AFPT & Fitness Assessment Score Calculator";
   const META_DESCRIPTION =
-    "Free USAF PFRA calculator for Air Force fitness scoring. Estimate waist-to-height ratio, push-ups, hand-release push-ups, sit-ups, reverse crunch, plank, 2-mile run, HAMR, PFRA totals, and AFSPECWAR/EOD scores.";
+    "Free USAF PFRA calculator for Air Force PT test and fitness assessment scoring. Estimate AFPT and USAF FA test points for waist-to-height ratio, push-ups, hand-release push-ups, sit-ups, reverse crunch, plank, 2-mile run, HAMR, PFRA totals, and AFSPECWAR/EOD scores.";
   const META_KEYWORDS = [
+    "People also search for this as an Air Force PT test, AFPT, USAF PT, Air Force fitness assessment, and USAF FA test calculator",
+    "Prorated exemptions supported",
     "USAF PFRA calculator",
     "Air Force fitness calculator",
-    "PFRA score calculator",
+    "Air Force PT test",
+    "AFPT",
+    "USAF PT",
+    "Air Force fitness assessment",
+    "USAF FA test",
+    "PFRA scoring charts",
+    "AFSPECWAR fitness test",
+    "EOD fitness test",
+    "2-mile run score",
+    "HAMR shuttle score",
     "Air Force PT test calculator",
-    "USAF fitness test score",
-    "AFSPECWAR EOD calculator",
-    "2 mile run calculator",
-    "HAMR calculator",
-    "waist to height ratio calculator",
-    "hand release push ups calculator",
+    "Air Force fitness assessment calculator",
+    "AFPT calculator",
+    "USAF FA calculator",
   ].join(", ");
 
   const ATTACHMENTS = [
-    { title: "Warfighter’s Fitness Playbook", subtitle: "2.0 • Feb 2026", url: "/attachments/Playbook.pdf", filename: "Playbook.pdf" },
+    { title: "Warfighter's Fitness Playbook", subtitle: "2.0 • Feb 2026", url: "/attachments/Playbook.pdf", filename: "Playbook.pdf" },
     {
       title: "PFRA Scoring Charts",
-      subtitle: "Includes AFSPECWAR/EOD page",
+      subtitle: "Includes AFSPECWAR / EOD page",
       url: "/attachments/PFRA_Scoring_Charts.pdf",
       filename: "PFRA_Scoring_Charts.pdf",
     },
@@ -356,6 +409,7 @@ export default function App() {
   const [exemptCardio, setExemptCardio] = useState(false);
 
   const [toast, setToast] = useState<{ message: string; kind: "ok" | "err" } | null>(null);
+  const [showOverview, setShowOverview] = useState(false);
   function showToast(message: string, kind: "ok" | "err" = "ok") {
     setToast({ message, kind });
     window.setTimeout(() => setToast(null), 2600);
@@ -375,18 +429,6 @@ export default function App() {
   useEffect(() => {
     if (vw < 680) setMobileMode(true);
   }, [vw]);
-
-  const introRef = useRef<HTMLElement | null>(null);
-  const calculatorRef = useRef<HTMLElement | null>(null);
-  const downloadsRef = useRef<HTMLElement | null>(null);
-  const faqRef = useRef<HTMLElement | null>(null);
-
-  function scrollToRef(ref: React.RefObject<HTMLElement | null>) {
-    const el = ref.current;
-    if (!el) return;
-    const y = el.getBoundingClientRect().top + (window.pageYOffset || window.scrollY || 0) - 12;
-    window.scrollTo({ top: y, behavior: "smooth" });
-  }
 
   const ageBand = useMemo(() => {
     const a = parseNumber(age);
@@ -503,9 +545,8 @@ export default function App() {
     return m;
   }, [exemptWHtR, exemptStrength, exemptCore, exemptCardio]);
 
-  const total = useMemo(() => (availableMax <= 0 ? 0 : (earnedTotal / availableMax) * 100), [earnedTotal, availableMax]);
-  const badge = scoreColor(total);
-  const showDiagnostic = isDiagnosticWindow();
+  const totalPercent = useMemo(() => (availableMax <= 0 ? 0 : (earnedTotal / availableMax) * 100), [earnedTotal, availableMax]);
+  const totalBand = getBandStyle(totalPercent);
 
   useEffect(() => {
     document.title = PAGE_TITLE;
@@ -515,6 +556,8 @@ export default function App() {
     upsertMetaTag({ name: "keywords", content: META_KEYWORDS });
     upsertMetaTag({ name: "robots", content: "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" });
     upsertMetaTag({ name: "theme-color", content: "#041A3A" });
+    upsertMetaTag({ name: "application-name", content: "USAF PFRA Calculator" });
+    upsertMetaTag({ name: "apple-mobile-web-app-title", content: "USAF PFRA Calculator" });
     upsertMetaTag({ property: "og:type", content: "website" });
     upsertMetaTag({ property: "og:title", content: PAGE_TITLE });
     upsertMetaTag({ property: "og:description", content: META_DESCRIPTION });
@@ -529,11 +572,21 @@ export default function App() {
       "@context": "https://schema.org",
       "@type": "WebApplication",
       name: "USAF PFRA Calculator",
+      alternateName: [
+        "Air Force fitness calculator",
+        "Air Force PT test calculator",
+        "AFPT calculator",
+        "USAF PT calculator",
+        "USAF FA test calculator",
+        "AFSPECWAR fitness test calculator",
+        "EOD fitness test calculator",
+      ],
       url: SITE_URL,
       applicationCategory: "HealthApplication",
       operatingSystem: "Any",
       browserRequirements: "Requires JavaScript",
       description: META_DESCRIPTION,
+      keywords: META_KEYWORDS,
       offers: {
         "@type": "Offer",
         price: "0",
@@ -541,6 +594,8 @@ export default function App() {
       },
       featureList: [
         "PFRA score calculator",
+        "Air Force PT test calculator",
+        "Air Force fitness assessment calculator",
         "AFSPECWAR/EOD score calculator",
         "Waist-to-height ratio scoring",
         "Push-ups and hand-release push-ups scoring",
@@ -550,35 +605,31 @@ export default function App() {
       ],
     });
 
-    upsertJsonLd("pfra-faq-schema", {
+    upsertJsonLd("pfra-webpage-schema", {
       "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: [
-        {
-          "@type": "Question",
-          name: "What does this USAF PFRA calculator estimate?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "It estimates PFRA component points for waist-to-height ratio, strength, core, cardio, prorated exemptions, and total score, and it also includes the universal AFSPECWAR/EOD chart.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "Can I use the calculator for both the 2-mile run and the HAMR?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "Yes. The cardio section lets you choose either the 2-mile run or the 20-meter HAMR shuttle count and calculates points for the selected program.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "Does this calculator replace official Air Force guidance?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "No. It is a quick score-estimation tool. Users should still verify official scoring, exemptions, and program requirements with current Air Force guidance and local policy.",
-          },
-        },
+      "@type": "WebPage",
+      name: PAGE_TITLE,
+      url: SITE_URL,
+      description: META_DESCRIPTION,
+      about: [
+        "USAF PFRA calculator",
+        "Air Force PT test",
+        "AFPT",
+        "USAF PT",
+        "Air Force fitness assessment",
+        "USAF FA test",
+        "PFRA scoring charts",
+        "AFSPECWAR fitness test",
+        "EOD fitness test",
+        "2-mile run score",
+        "HAMR shuttle score",
       ],
+      mainEntity: {
+        "@type": "SoftwareApplication",
+        name: "USAF PFRA Calculator",
+        applicationCategory: "HealthApplication",
+        operatingSystem: "Any",
+      },
     });
   }, [META_DESCRIPTION, META_KEYWORDS, PAGE_TITLE, SITE_URL]);
 
@@ -598,6 +649,7 @@ export default function App() {
     fontSize: 14,
     background: "rgba(255,255,255,0.06)",
     color: "#FFFFFF",
+    boxSizing: "border-box",
   };
 
   const selectStyle: React.CSSProperties = { ...inputStyle };
@@ -642,31 +694,8 @@ export default function App() {
     color: subtleText,
   };
 
-  const gridCols = mobileMode ? "1fr" : isNarrow ? "1fr 1fr" : "repeat(4, minmax(0, 1fr))";
   const mainCols = mobileMode ? "1fr" : isNarrow ? "1fr 1fr" : "1.15fr 1fr 1fr";
-
-  const kpiCardStyle: React.CSSProperties = {
-    ...cardStyle,
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-    minHeight: 78,
-  };
-
-  const seoKeywords = [
-    "USAF PFRA calculator",
-    "Air Force fitness calculator",
-    "Air Force PT score calculator",
-    "PFRA scoring charts",
-    "AFSPECWAR EOD score chart",
-    "waist-to-height ratio score",
-    "push-ups score",
-    "HRPU score",
-    "sit-ups score",
-    "plank score",
-    "2-mile run score",
-    "HAMR shuttle score",
-  ];
+  const scoreCols = isVeryNarrow ? "1fr" : isNarrow ? "1fr 1fr" : "repeat(5, minmax(0, 1fr))";
 
   return (
     <div
@@ -699,10 +728,8 @@ export default function App() {
         .af-btn:hover { background: rgba(255,255,255,0.10); }
         .af-btn:disabled { opacity: 0.55; cursor: not-allowed; }
         .af-btn--sm { padding: 8px 10px; border-radius: 10px; font-size: 12px; }
-        .af-btn--pill { padding: 8px 10px; border-radius: 999px; font-size: 12px; }
         .af-select { color: #fff; background: rgba(255,255,255,0.06); }
         .af-select option { color: #fff; background: #061a39; }
-        .af-section-anchor { scroll-margin-top: 16px; }
       `}</style>
 
       <main style={{ width: "100%", maxWidth: 1160, padding: mobileMode ? 12 : 16 }}>
@@ -715,103 +742,32 @@ export default function App() {
           }}
         />
 
-        <header ref={introRef} className="af-section-anchor" style={{ ...cardStyle, background: "rgba(0,0,0,0.18)" }}>
+        <header style={{ ...cardStyle, background: "rgba(0,0,0,0.18)" }}>
           <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.2fr 0.8fr", gap: 14, alignItems: "center" }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.15, color: "rgba(255,255,255,0.72)" }}>USAF FITNESS</div>
               <h1 style={{ margin: "6px 0 8px", fontSize: mobileMode ? 28 : 34, lineHeight: 1.06 }}>USAF PFRA Calculator</h1>
               <p style={{ margin: 0, color: subtleText, lineHeight: 1.55, fontSize: 15 }}>
-                Free Air Force fitness test calculator for PFRA scoring, AFSPECWAR/EOD standards, waist-to-height ratio,
-                push-ups, hand-release push-ups, sit-ups, reverse crunch, plank, 2-mile run, and HAMR scoring.
+                Quick PFRA and AFSPECWAR / EOD score estimates for waist-to-height ratio, strength, core, cardio, and prorated exemptions.
               </p>
-              <p style={{ margin: "10px 0 0", color: faintText, lineHeight: 1.55, fontSize: 13.5 }}>
-                Built to make it easier for Airmen and candidates to estimate component points quickly before checking official
-                charts and local guidance.
-              </p>
-
-              <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(calculatorRef)}>
-                  Jump to calculator
-                </button>
-                <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(downloadsRef)}>
-                  View PDFs
-                </button>
-                <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(faqRef)}>
-                  Read FAQ
-                </button>
-              </div>
             </div>
 
-            <aside style={{ ...cardStyle, padding: 12 }} aria-label="Quick facts">
+            <aside style={{ ...cardStyle, padding: 12 }} aria-label="Quick overview">
               <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>QUICK OVERVIEW</div>
               <div style={{ marginTop: 8, display: "grid", gap: 8, fontSize: 13.5, color: subtleText }}>
-                <div>WHtR 20 + Strength 15 + Core 15 + Cardio 50 = 100</div>
-                <div>Program toggle for PFRA and AFSPECWAR / EOD</div>
-                <div>Prorated exemptions supported</div>
-                <div>Version {APP_VERSION} · Updated {APP_UPDATED}</div>
+                <div>WHtR 20 + Strength 15 + Core 15 + Cardio 50</div>
+                <div>PFRA and AFSPECWAR / EOD supported</div>
+                <div>Component colors match your requested bands</div>
+                <div>Version {APP_VERSION} • Updated {APP_UPDATED}</div>
               </div>
             </aside>
           </div>
-
-          <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {seoKeywords.map((word) => (
-              <span key={word} style={{ ...sectionTagStyle, fontSize: 10.5 }}>
-                {word}
-              </span>
-            ))}
-          </div>
         </header>
 
-        <section style={{ marginTop: 12, display: "grid", gridTemplateColumns: gridCols, gap: 10 }} aria-label="Summary metrics">
-          <div style={kpiCardStyle}>
-            <div style={{ fontSize: 11.5, color: faintText, fontWeight: 850 }}>WHtR</div>
-            <div style={{ fontSize: 28, fontWeight: 950 }}>{earnedWHtR.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>{exemptWHtR ? "Exempt" : whtrData.rounded == null ? "—" : `Rounded ${whtrData.rounded.toFixed(2)}`}</div>
-          </div>
-          <div style={kpiCardStyle}>
-            <div style={{ fontSize: 11.5, color: faintText, fontWeight: 850 }}>STRENGTH</div>
-            <div style={{ fontSize: 28, fontWeight: 950 }}>{earnedStrength.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>{exemptStrength ? "Exempt" : strengthTest === "pushups" ? "Push-ups" : "HRPU"}</div>
-          </div>
-          <div style={kpiCardStyle}>
-            <div style={{ fontSize: 11.5, color: faintText, fontWeight: 850 }}>CORE</div>
-            <div style={{ fontSize: 28, fontWeight: 950 }}>{earnedCore.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>{exemptCore ? "Exempt" : coreTest === "situps" ? "Sit-ups" : coreTest === "reverse_crunch" ? "Reverse crunch" : "Plank"}</div>
-          </div>
-          <div style={kpiCardStyle}>
-            <div style={{ fontSize: 11.5, color: faintText, fontWeight: 850 }}>TOTAL</div>
-            <div style={{ fontSize: 28, fontWeight: 950 }}>{total.toFixed(1)}</div>
-            <div style={{ marginTop: 2 }}>
-              <span
-                style={{
-                  background: badge.bg,
-                  color: badge.fg,
-                  borderRadius: 999,
-                  padding: "4px 9px",
-                  fontSize: 11,
-                  fontWeight: 950,
-                }}
-              >
-                {badge.label}
-              </span>
-            </div>
-          </div>
-        </section>
-
-        {showDiagnostic && (
-          <section style={{ marginTop: 12, ...cardStyle }} aria-label="Diagnostic notice">
-            <div style={{ fontWeight: 950, fontSize: 13.5 }}>Diagnostic window notice</div>
-            <div style={{ marginTop: 6, color: faintText, fontSize: 12.5 }}>
-              Active until <strong style={{ color: "#fff" }}>1 Jul 2026</strong>. Continue verifying official scoring,
-              exemptions, and unit policy.
-            </div>
-          </section>
-        )}
-
-        <section ref={calculatorRef} className="af-section-anchor" style={{ marginTop: 12, ...cardStyle }} aria-labelledby="calculator-heading">
+        <section style={{ marginTop: 12, ...cardStyle }} aria-labelledby="calculator-heading">
           <div style={sectionTitleStyle}>
-            <h2 id="calculator-heading" style={{ margin: 0, fontSize: 20 }}>Air Force Fitness Score Calculator</h2>
-            <span style={sectionTagStyle}>Calculator</span>
+            <h2 id="calculator-heading" style={{ margin: 0, fontSize: 20 }}>Calculator</h2>
+            
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: mainCols, gap: 12 }}>
@@ -830,7 +786,7 @@ export default function App() {
                       <option value="AFSPECWAR_EOD">AFSPECWAR / EOD</option>
                     </select>
                     <div style={{ marginTop: 8, fontSize: 11, color: faintText }}>
-                      {isAFSPEC ? "Universal AFSPECWAR/EOD chart for all ages and genders" : "Age and gender based PFRA scoring"}
+                      {isAFSPEC ? "Universal AFSPECWAR / EOD chart for all ages and genders" : "Age- and gender-based PFRA scoring"}
                     </div>
                   </div>
 
@@ -854,7 +810,7 @@ export default function App() {
                       <option value="M">Male</option>
                       <option value="F">Female</option>
                     </select>
-                    {isAFSPEC && <div style={{ marginTop: 8, fontSize: 11, color: faintText }}>Not used for the universal AFSPECWAR/EOD chart</div>}
+                    {isAFSPEC && <div style={{ marginTop: 8, fontSize: 11, color: faintText }}>Not used for the universal AFSPECWAR / EOD chart</div>}
                   </div>
 
                   <div>
@@ -914,7 +870,6 @@ export default function App() {
                     disabled={exemptStrength}
                   />
                 </div>
-                <div style={{ marginTop: 10, fontSize: 13, color: subtleText }}>Points: <strong style={{ color: "#fff" }}>{earnedStrength.toFixed(1)}</strong></div>
               </section>
 
               <section style={{ ...cardStyle, opacity: exemptCore ? 0.65 : 1 }} aria-labelledby="core-heading">
@@ -947,7 +902,6 @@ export default function App() {
                     disabled={exemptCore}
                   />
                 </div>
-                <div style={{ marginTop: 10, fontSize: 13, color: subtleText }}>Points: <strong style={{ color: "#fff" }}>{earnedCore.toFixed(1)}</strong></div>
               </section>
             </div>
 
@@ -975,96 +929,107 @@ export default function App() {
                     disabled={exemptCardio}
                   />
                 </div>
-                <div style={{ marginTop: 10, fontSize: 13, color: subtleText }}>Points: <strong style={{ color: "#fff" }}>{earnedCardio.toFixed(1)}</strong></div>
               </section>
 
-              <section style={cardStyle} aria-labelledby="breakdown-heading">
+              <section style={cardStyle} aria-labelledby="exemptions-heading">
                 <div style={sectionTitleStyle}>
-                  <h3 id="breakdown-heading" style={{ margin: 0, fontSize: 16 }}>Breakdown</h3>
-                  <span style={sectionTagStyle}>Summary</span>
+                  <h3 id="exemptions-heading" style={{ margin: 0, fontSize: 16 }}>Exemptions</h3>
+                  
                 </div>
-                <div style={{ display: "grid", gap: 8, color: subtleText, fontSize: 13 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>WHtR</span><strong style={{ color: "#fff" }}>{earnedWHtR.toFixed(1)}</strong></div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>Strength</span><strong style={{ color: "#fff" }}>{earnedStrength.toFixed(1)}</strong></div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>Core</span><strong style={{ color: "#fff" }}>{earnedCore.toFixed(1)}</strong></div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}><span>Cardio</span><strong style={{ color: "#fff" }}>{earnedCardio.toFixed(1)}</strong></div>
-                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.12)", paddingTop: 10, marginTop: 2 }}>
-                    <span style={{ fontWeight: 950 }}>Total</span>
-                    <strong style={{ color: "#fff", fontSize: 17 }}>{total.toFixed(1)}</strong>
-                  </div>
-                  <div style={{ fontSize: 11.5, color: faintText }}>Available max: <strong style={{ color: "#fff" }}>{availableMax.toFixed(0)}</strong> · Earned: <strong style={{ color: "#fff" }}>{earnedTotal.toFixed(1)}</strong></div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  {[
+                    { label: "WHtR (0–20)", v: exemptWHtR, set: setExemptWHtR },
+                    { label: "Strength (0–15)", v: exemptStrength, set: setExemptStrength },
+                    { label: "Core (0–15)", v: exemptCore, set: setExemptCore },
+                    { label: "Cardio (0–50)", v: exemptCardio, set: setExemptCardio },
+                  ].map((x) => (
+                    <label
+                      key={x.label}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "8px 10px",
+                        borderRadius: 12,
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        background: "rgba(255,255,255,0.04)",
+                        fontSize: 12,
+                        fontWeight: 850,
+                      }}
+                    >
+                      <input type="checkbox" checked={x.v} onChange={(e) => x.set(e.target.checked)} />
+                      Exempt: {x.label}
+                    </label>
+                  ))}
                 </div>
               </section>
             </div>
           </div>
-
-          <section style={{ marginTop: 12, ...cardStyle }} aria-labelledby="exemptions-heading">
-            <div style={sectionTitleStyle}>
-              <h3 id="exemptions-heading" style={{ margin: 0, fontSize: 16 }}>Exemptions</h3>
-              <span style={sectionTagStyle}>Prorated</span>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              {[
-                { label: "WHtR (0–20)", v: exemptWHtR, set: setExemptWHtR },
-                { label: "Strength (0–15)", v: exemptStrength, set: setExemptStrength },
-                { label: "Core (0–15)", v: exemptCore, set: setExemptCore },
-                { label: "Cardio (0–50)", v: exemptCardio, set: setExemptCardio },
-              ].map((x) => (
-                <label
-                  key={x.label}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "8px 10px",
-                    borderRadius: 12,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.04)",
-                    fontSize: 12,
-                    fontWeight: 850,
-                  }}
-                >
-                  <input type="checkbox" checked={x.v} onChange={(e) => x.set(e.target.checked)} />
-                  Exempt: {x.label}
-                </label>
-              ))}
-            </div>
-          </section>
         </section>
 
-        <section style={{ marginTop: 12, ...cardStyle }} aria-labelledby="about-heading">
+        <section style={{ marginTop: 12, ...cardStyle }} aria-labelledby="scores-heading">
           <div style={sectionTitleStyle}>
-            <h2 id="about-heading" style={{ margin: 0, fontSize: 20 }}>How this PFRA calculator helps people find the right score faster</h2>
-            <span style={sectionTagStyle}>Overview</span>
+            <h2 id="scores-heading" style={{ margin: 0, fontSize: 20 }}>Totals</h2>
+            
           </div>
-          <div style={{ display: "grid", gap: 10, color: subtleText, lineHeight: 1.6, fontSize: 14 }}>
-            <p style={{ margin: 0 }}>
-              This page is designed for people searching for a <strong style={{ color: "#fff" }}>USAF PFRA calculator</strong>,
-              an <strong style={{ color: "#fff" }}>Air Force fitness calculator</strong>, an
-              <strong style={{ color: "#fff" }}> Air Force PT score calculator</strong>, or a quick way to estimate points for
-              waist-to-height ratio, push-ups, hand-release push-ups, sit-ups, reverse crunch, plank, 2-mile run, and HAMR.
-            </p>
-            <p style={{ margin: 0 }}>
-              It also supports <strong style={{ color: "#fff" }}>AFSPECWAR / EOD scoring</strong> with the universal chart,
-              which makes the page relevant for users looking for AFSPECWAR fitness standards, EOD fitness score estimates,
-              and PFRA scoring chart references in one place.
-            </p>
-            <p style={{ margin: 0 }}>
-              Download links to the playbook, PFRA scoring charts, and DAFMAN reference PDFs are included below so visitors can
-              compare calculator output against source documents quickly.
-            </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: scoreCols, gap: 10 }}>
+            <ScoreCard
+              title="WHtR"
+              points={earnedWHtR}
+              maxPoints={maxWHtR}
+              exempt={exemptWHtR}
+              descriptor={exemptWHtR ? "Excluded from composite" : `${earnedWHtR.toFixed(1)} of ${maxWHtR}`}
+            />
+            <ScoreCard
+              title="Strength"
+              points={earnedStrength}
+              maxPoints={maxStrength}
+              exempt={exemptStrength}
+              descriptor={exemptStrength ? "Excluded from composite" : `${earnedStrength.toFixed(1)} of ${maxStrength}`}
+            />
+            <ScoreCard
+              title="Core"
+              points={earnedCore}
+              maxPoints={maxCore}
+              exempt={exemptCore}
+              descriptor={exemptCore ? "Excluded from composite" : `${earnedCore.toFixed(1)} of ${maxCore}`}
+            />
+            <ScoreCard
+              title="Cardio"
+              points={earnedCardio}
+              maxPoints={maxCardio}
+              exempt={exemptCardio}
+              descriptor={exemptCardio ? "Excluded from composite" : `${earnedCardio.toFixed(1)} of ${maxCardio}`}
+            />
+            <div
+              style={{
+                borderRadius: 16,
+                padding: 14,
+                background: totalBand.bg,
+                color: totalBand.fg,
+                border: `1px solid ${totalBand.border}`,
+                boxShadow: "0 10px 24px rgba(0,0,0,0.20)",
+                minHeight: 116,
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
+              <div style={{ fontSize: 11.5, fontWeight: 900, opacity: 0.86, letterSpacing: 0.8, textTransform: "uppercase" }}>Composite</div>
+              <div style={{ fontSize: 30, fontWeight: 950, lineHeight: 1 }}>{earnedTotal.toFixed(1)}</div>
+              <div style={{ fontSize: 14, fontWeight: 900 }}>{formatPercent(totalPercent)}</div>
+              <div style={{ fontSize: 11.5, opacity: 0.9 }}>{earnedTotal.toFixed(1)} of {availableMax.toFixed(0)} available points</div>
+            </div>
           </div>
+
         </section>
 
-        <section ref={downloadsRef} className="af-section-anchor" style={{ marginTop: 12, ...cardStyle }} aria-labelledby="downloads-heading">
+        <section style={{ marginTop: 12, ...cardStyle }} aria-labelledby="downloads-heading">
           <div style={sectionTitleStyle}>
-            <h2 id="downloads-heading" style={{ margin: 0, fontSize: 20 }}>Official reference downloads</h2>
+            <h2 id="downloads-heading" style={{ margin: 0, fontSize: 20 }}>Official references</h2>
             <span style={sectionTagStyle}>PDF</span>
           </div>
-          <p style={{ marginTop: 0, marginBottom: 12, color: faintText, lineHeight: 1.55 }}>
-            These reference files help users confirm Air Force fitness scoring details and give search engines more context about
-            the page topic through clearly labeled resource links.
-          </p>
           <div style={{ display: "grid", gridTemplateColumns: isVeryNarrow ? "1fr" : isNarrow ? "1fr 1fr" : "repeat(3, minmax(220px, 1fr))", gap: 10 }}>
             {ATTACHMENTS.map((a) => (
               <AttachmentTile
@@ -1074,40 +1039,48 @@ export default function App() {
                 url={a.url}
                 filename={a.filename}
                 isVeryNarrow={isVeryNarrow}
-                onDownloaded={(fn) => showToast(`✅ Downloaded: ${fn}`, "ok")}
+                onDownloaded={(fn) => showToast(`Downloaded: ${fn}`, "ok")}
                 onDownloadFailed={(detail) => showToast(`Download failed. ${detail ? `(${detail})` : ""}`, "err")}
               />
             ))}
           </div>
         </section>
 
-        <section ref={faqRef} className="af-section-anchor" style={{ marginTop: 12, ...cardStyle }} aria-labelledby="faq-heading">
-          <div style={sectionTitleStyle}>
-            <h2 id="faq-heading" style={{ margin: 0, fontSize: 20 }}>Frequently asked questions</h2>
-            <span style={sectionTagStyle}>FAQ</span>
+        <section style={{ marginTop: 12, ...cardStyle }} aria-labelledby="about-heading">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <button
+              id="about-heading"
+              type="button"
+              className="af-btn"
+              aria-expanded={showOverview}
+              aria-controls="overview-panel"
+              onClick={() => setShowOverview((v) => !v)}
+            >
+              {showOverview ? "Hide Overview" : "Overview"}
+            </button>
           </div>
-          <div style={{ display: "grid", gap: 10 }}>
-            <div>
-              <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>What does this USAF PFRA calculator estimate?</h3>
-              <p style={{ margin: 0, color: subtleText, lineHeight: 1.55 }}>
-                It estimates PFRA component points for body composition, strength, core, cardio, exemptions, and overall score.
-                It also includes the AFSPECWAR / EOD universal scoring option.
+          {showOverview && (
+            <div id="overview-panel" style={{ display: "grid", gap: 10, color: subtleText, lineHeight: 1.6, fontSize: 14, marginTop: 12 }}>
+              <p style={{ margin: 0 }}>
+                This page is designed for people searching for a <strong style={{ color: "#fff" }}>USAF PFRA calculator</strong>,
+                an <strong style={{ color: "#fff" }}>Air Force fitness calculator</strong>, an
+                <strong style={{ color: "#fff" }}> Air Force PT test calculator</strong>, an
+                <strong style={{ color: "#fff" }}> AFPT calculator</strong>, a
+                <strong style={{ color: "#fff" }}> USAF PT calculator</strong>, or a
+                <strong style={{ color: "#fff" }}> USAF FA test</strong> score estimator for waist-to-height ratio, push-ups,
+                hand-release push-ups, sit-ups, reverse crunch, plank, 2-mile run, and HAMR.
+              </p>
+              <p style={{ margin: 0 }}>
+                It also supports <strong style={{ color: "#fff" }}>AFSPECWAR / EOD scoring</strong> with the universal chart,
+                which makes the page relevant for users looking for AFSPECWAR fitness standards, EOD fitness test references,
+                EOD fitness score estimates, and PFRA scoring chart references in one place.
+              </p>
+              <p style={{ margin: 0 }}>
+                Official reference downloads are included above so visitors can compare calculator output against source documents
+                quickly while still using a faster score-estimation tool on mobile or desktop.
               </p>
             </div>
-            <div>
-              <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>Can I use it for the 2-mile run and the HAMR?</h3>
-              <p style={{ margin: 0, color: subtleText, lineHeight: 1.55 }}>
-                Yes. Choose either the 2-mile run time or the 20-meter HAMR shuttle count in the cardio section.
-              </p>
-            </div>
-            <div>
-              <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>Does this replace official Air Force guidance?</h3>
-              <p style={{ margin: 0, color: subtleText, lineHeight: 1.55 }}>
-                No. This is a quick estimation tool. Users should still verify current scoring, exemptions, and local policy with
-                official guidance.
-              </p>
-            </div>
-          </div>
+          )}
         </section>
 
         <footer style={{ marginTop: 14, paddingTop: 10, textAlign: "center" }}>
@@ -1120,13 +1093,6 @@ export default function App() {
             Always verify scoring, exemptions, and program requirements against current official guidance and local unit policy.
           </div>
         </footer>
-
-        <noscript>
-          <div style={{ marginTop: 12, color: "#fff" }}>
-            JavaScript is required for the interactive Air Force PFRA calculator, but the page still describes PFRA scoring,
-            AFSPECWAR/EOD scoring, and the linked reference PDFs.
-          </div>
-        </noscript>
       </main>
 
       {toast && (
