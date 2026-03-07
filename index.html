@@ -1,59 +1,67 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>USAF PFRA Calculator | Air Force PT Test, AFPT & Fitness Assessment Calculator</title>
-    <meta
-      name="description"
-      content="Free USAF PFRA calculator for Air Force PT test and fitness assessment scoring. Estimate AFPT and USAF FA test scores for pushups, hand-release pushups, situps, reverse crunch, plank, 2-mile run, HAMR, waist-to-height ratio, and AFSPECWAR/EOD standards."
-    />
-    <meta
-      name="keywords"
-      content="USAF PFRA Calculator, Air Force fitness calculator, Air Force PT test, Air Force PT test calculator, Air Force fitness assessment, Air Force fitness assessment calculator, AFPT, AFPT calculator, USAF PT, USAF PT test, USAF FA test, USAF FA calculator, PFRA score calculator, Air Force PT score, HAMR calculator, 2 mile run calculator, waist to height ratio calculator, AFSPECWAR EOD calculator, AFSPECWAR fitness test, EOD fitness test"
-    />
-    <meta name="author" content="Jeff Hartman" />
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-    <link rel="canonical" href="https://usafpfracalculator.com/" />
 
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://usafpfracalculator.com/" />
-    <meta property="og:title" content="USAF PFRA Calculator | Air Force PT Test, AFPT & Fitness Assessment Calculator" />
-    <meta
-      property="og:description"
-      content="Calculate Air Force PFRA, AFPT, USAF PT, USAF FA test, and AFSPECWAR/EOD scores with support for HAMR, 2-mile run, strength, core, and body composition components."
-    />
-    <meta property="og:site_name" content="USAF PFRA Calculator" />
+<head>
+  <meta charset="UTF-8" />
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="USAF PFRA Calculator | Air Force PT Test, AFPT & Fitness Assessment Calculator" />
-    <meta
-      name="twitter:description"
-      content="Free Air Force fitness calculator for PFRA, AFPT, USAF PT, USAF FA test, and AFSPECWAR/EOD standards, including HAMR, 2-mile run, strength, core, and WHtR scoring."
-    />
+  <!-- Mobile -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <meta name="theme-color" content="#00308F" />
-    <meta name="application-name" content="USAF PFRA Calculator" />
-    <link rel="manifest" href="/site.webmanifest" />
+  <!-- Title (kept under ~60 characters for SEO) -->
+  <title>USAF PFRA Calculator | Air Force PT Test Score</title>
 
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "USAF PFRA Calculator",
-        "url": "https://usafpfracalculator.com/",
-        "description": "Free Air Force PT test, AFPT, USAF PT, USAF FA test, and PFRA score calculator for PFRA and AFSPECWAR/EOD testing.",
-        "keywords": "USAF PFRA calculator, Air Force PT test, AFPT, USAF PT, Air Force fitness assessment, USAF FA test, AFSPECWAR fitness test, EOD fitness test",
-        "publisher": {
-          "@type": "Organization",
-          "name": "USAF PFRA Calculator"
-        }
-      }
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+  <!-- Meta Description (~150 characters ideal) -->
+  <meta name="description"
+    content="Calculate your USAF PFRA score for the Air Force PT test. Includes strength, core, cardio, HAMR, and 2-mile run scoring." />
+
+  <!-- SEO Keywords -->
+  <meta name="keywords"
+    content="USAF PFRA calculator, Air Force PT calculator, AF PT test, Air Force fitness assessment, AFPT score calculator, USAF FA test, HAMR score calculator, 2 mile run score, AFSPECWAR fitness test, EOD fitness test" />
+
+  <!-- Author -->
+  <meta name="author" content="Jeff Hartman" />
+
+  <!-- Open Graph (social sharing) -->
+  <meta property="og:title" content="USAF PFRA Calculator" />
+  <meta property="og:description"
+    content="Air Force PFRA score calculator for strength, core, cardio, HAMR, and 2-mile run." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://usafpfracalculator.com" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/branding/usaf_wings_transparent_refined.png" />
+
+  <!-- Structured Data for Search -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "USAF PFRA Calculator",
+    "url": "https://usafpfracalculator.com",
+    "applicationCategory": "HealthApplication",
+    "operatingSystem": "Web",
+    "description": "Calculator for the United States Air Force Physical Fitness Risk Assessment (PFRA) including strength, core, and cardio scoring.",
+    "creator": {
+      "@type": "Person",
+      "name": "Jeff Hartman"
+    }
+  }
+  </script>
+
+</head>
+
+<body>
+
+  <!-- Hidden H1 for SEO -->
+  <h1 style="position:absolute;left:-9999px;">
+    USAF PFRA Calculator – Air Force PT Test Score Tool
+  </h1>
+
+  <div id="root"></div>
+
+  <!-- React Entry -->
+  <script type="module" src="/src/main.tsx"></script>
+
+</body>
+
 </html>
