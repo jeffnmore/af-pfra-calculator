@@ -84,10 +84,11 @@ function lookupMaxTimePointsPFRA(table: any, ageBand: string, gender: Gender, ti
   return 0;
 }
 
-function scoreColor(total: number): { bg: string; fg: string; label: string } {
-  if (total >= 90) return { bg: "#0A7A2F", fg: "#FFFFFF", label: "EXCELLENT (≥ 90)" };
-  if (total >= 75) return { bg: "#F2C200", fg: "#111111", label: "SATISFACTORY (75–89.9)" };
-  return { bg: "#B00020", fg: "#FFFFFF", label: "UNSATISFACTORY (< 75)" };
+function performanceBand(pct: number): { bg: string; fg: string; border: string } {
+  if (pct >= 90) return { bg: "rgba(10,122,47,0.92)", fg: "#FFFFFF", border: "rgba(10,122,47,1)" };
+  if (pct >= 80) return { bg: "rgba(242,194,0,0.92)", fg: "#111111", border: "rgba(242,194,0,1)" };
+  if (pct >= 75) return { bg: "rgba(255,165,0,0.92)", fg: "#111111", border: "rgba(255,165,0,1)" };
+  return { bg: "rgba(176,0,32,0.92)", fg: "#FFFFFF", border: "rgba(176,0,32,1)" };
 }
 
 function compositeCategory(total: number): "Unsatisfactory" | "Satisfactory" | "Excellent" {
@@ -96,9 +97,8 @@ function compositeCategory(total: number): "Unsatisfactory" | "Satisfactory" | "
   return "Unsatisfactory";
 }
 
-function componentPercent(points: number, max: number): string {
-  if (!Number.isFinite(points) || !Number.isFinite(max) || max <= 0) return "0.0%";
-  return `${((points / max) * 100).toFixed(1)}%`;
+function formatPct(value: number): string {
+  return `${value.toFixed(1)}%`;
 }
 
 function isDiagnosticWindow(): boolean {
@@ -217,53 +217,6 @@ function AttachmentTile(props: {
   );
 }
 
-function SmartQrImage(props: { candidates: string[]; alt: string; boxSize?: number }) {
-  const { candidates, alt, boxSize = 188 } = props;
-  const [idx, setIdx] = useState(0);
-
-  if (candidates.length === 0) {
-    return (
-      <div
-        style={{
-          width: boxSize,
-          height: boxSize,
-          borderRadius: 14,
-          border: "1px dashed rgba(255,255,255,0.22)",
-          background: "rgba(255,255,255,0.03)",
-          display: "grid",
-          placeItems: "center",
-          color: "rgba(255,255,255,0.65)",
-          fontSize: 12,
-          textAlign: "center",
-          padding: 14,
-        }}
-      >
-        QR code image not found.
-      </div>
-    );
-  }
-
-  const src = candidates[Math.min(idx, candidates.length - 1)];
-
-  return (
-    <img
-      src={src}
-      alt={alt}
-      style={{
-        width: boxSize,
-        maxWidth: "100%",
-        aspectRatio: "1 / 1",
-        objectFit: "contain",
-        borderRadius: 14,
-        border: "1px solid rgba(255,255,255,0.12)",
-        background: "#fff",
-        padding: 10,
-      }}
-      onError={() => setIdx((current) => (current < candidates.length - 1 ? current + 1 : current))}
-    />
-  );
-}
-
 const AFSPEC_STRENGTH_CORE: Array<{
   pts: number;
   pushups: number;
@@ -364,9 +317,9 @@ export default function App() {
   const APP_VERSION = "1.2.0";
   const APP_UPDATED = "2026-03-07";
   const SITE_URL = "https://usafpfracalculator.com";
-  const PAGE_TITLE = "USAF PFRA Calculator | Air Force PT Test, AFPT & Fitness Assessment Score Calculator";
+  const PAGE_TITLE = "USAF PFRA Calculator | Air Force PT Score";
   const META_DESCRIPTION =
-    "Free USAF PFRA calculator for Air Force PT test and fitness assessment scoring. Estimate AFPT and USAF FA test points for waist-to-height ratio, push-ups, hand-release push-ups, sit-ups, reverse crunch, plank, 2-mile run, HAMR, PFRA totals, and AFSPECWAR/EOD scores.";
+    "Calculate USAF PFRA scores for waist-to-height ratio, strength, core, cardio, HAMR, and 2-mile run with AFSPECWAR/EOD support.";
   const META_KEYWORDS = [
     "USAF PFRA calculator",
     "Air Force fitness calculator",
@@ -426,9 +379,6 @@ export default function App() {
   const [exemptCardio, setExemptCardio] = useState(false);
 
   const [toast, setToast] = useState<{ message: string; kind: "ok" | "err" } | null>(null);
-  const [showOverview, setShowOverview] = useState(false);
-  const [showSupport, setShowSupport] = useState(false);
-  const [showStickyRibbon, setShowStickyRibbon] = useState(false);
   function showToast(message: string, kind: "ok" | "err" = "ok") {
     setToast({ message, kind });
     window.setTimeout(() => setToast(null), 2600);
@@ -449,6 +399,10 @@ export default function App() {
     if (vw < 680) setMobileMode(true);
   }, [vw]);
 
+  const [showOverview, setShowOverview] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
+  const [showMobileTicker, setShowMobileTicker] = useState(false);
+
   const introRef = useRef<HTMLElement | null>(null);
   const calculatorRef = useRef<HTMLElement | null>(null);
   const downloadsRef = useRef<HTMLElement | null>(null);
@@ -460,6 +414,13 @@ export default function App() {
     const y = el.getBoundingClientRect().top + (window.pageYOffset || window.scrollY || 0) - 12;
     window.scrollTo({ top: y, behavior: "smooth" });
   }
+
+  useEffect(() => {
+    const onScroll = () => setShowMobileTicker((window.scrollY || window.pageYOffset || 0) > 20);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const ageBand = useMemo(() => {
     const a = parseNumber(age);
@@ -577,39 +538,19 @@ export default function App() {
   }, [exemptWHtR, exemptStrength, exemptCore, exemptCardio]);
 
   const total = useMemo(() => (availableMax <= 0 ? 0 : (earnedTotal / availableMax) * 100), [earnedTotal, availableMax]);
-  const badge = scoreColor(total);
-  const compositeText = compositeCategory(total);
   const showDiagnostic = isDiagnosticWindow();
-
-  useEffect(() => {
-    const onScroll = () => {
-      const y = window.scrollY || window.pageYOffset || 0;
-      setShowStickyRibbon(y > 8);
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const cashAppQrCandidates = [
-    "/branding/cashapp-qr.png",
-    "/branding/cashapp-qr.jpg",
-    "/branding/cash-app-qr.png",
-    "/branding/cash-app-qr.jpg",
-    "/branding/cashapp.jpg",
-    "/branding/cashapp.png",
-    "/attachments/cashapp-qr.png",
-    "/attachments/cashapp-qr.jpg",
-  ];
-
-  const venmoQrCandidates = [
-    "/branding/venmo-qr.png",
-    "/branding/venmo-qr.jpg",
-    "/branding/venmo.jpg",
-    "/branding/venmo.png",
-    "/attachments/venmo-qr.png",
-    "/attachments/venmo-qr.jpg",
-  ];
+  const compositeText = compositeCategory(total);
+  const whtrPct = exemptWHtR ? null : (earnedWHtR / maxWHtR) * 100;
+  const strengthPct = exemptStrength ? null : (earnedStrength / maxStrength) * 100;
+  const corePct = exemptCore ? null : (earnedCore / maxCore) * 100;
+  const cardioPct = exemptCardio ? null : (earnedCardio / maxCardio) * 100;
+  const whtrBand = whtrPct == null ? null : performanceBand(whtrPct);
+  const strengthBand = strengthPct == null ? null : performanceBand(strengthPct);
+  const coreBand = corePct == null ? null : performanceBand(corePct);
+  const cardioBand = cardioPct == null ? null : performanceBand(cardioPct);
+  const compositeBand = performanceBand(total);
+  const CASH_APP_URL = "https://cash.app/$FingersHMAN";
+  const VENMO_URL = "https://account.venmo.com/u/Fingers-HMAN";
 
   useEffect(() => {
     document.title = PAGE_TITLE;
@@ -663,45 +604,6 @@ export default function App() {
         "Sit-ups, reverse crunch, and plank scoring",
         "2-mile run and HAMR scoring",
         "Prorated exemption support",
-      ],
-    });
-
-    upsertJsonLd("pfra-faq-schema", {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: [
-        {
-          "@type": "Question",
-          name: "What does this USAF PFRA calculator estimate?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "It estimates PFRA component points for waist-to-height ratio, strength, core, cardio, prorated exemptions, and total score, and it also includes the universal AFSPECWAR/EOD chart.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "Can I use the calculator for both the 2-mile run and the HAMR?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "Yes. The cardio section lets you choose either the 2-mile run or the 20-meter HAMR shuttle count and calculates points for the selected program.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "Is this the same as an AFPT, USAF PT, or USAF FA test calculator?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "For most search intent, yes. People often use different names such as Air Force PT test, AFPT, USAF PT, Air Force fitness assessment, and USAF FA test calculator when looking for the same type of score estimator.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "Does this calculator replace official Air Force guidance?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "No. It is a quick score-estimation tool. Users should still verify official scoring, exemptions, and program requirements with current Air Force guidance and local policy.",
-          },
-        },
       ],
     });
 
@@ -792,31 +694,10 @@ export default function App() {
     color: subtleText,
   };
 
-  const gridCols = mobileMode ? "1fr" : isNarrow ? "1fr 1fr" : "repeat(4, minmax(0, 1fr))";
+  const gridCols = mobileMode ? "1fr" : isNarrow ? "1fr 1fr" : "repeat(5, minmax(0, 1fr))";
   const mainCols = mobileMode ? "1fr" : isNarrow ? "1fr 1fr" : "1.15fr 1fr 1fr";
 
-  const kpiCardStyle: React.CSSProperties = {
-    ...cardStyle,
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-    minHeight: 78,
-  };
 
-  const seoKeywords = [
-    "USAF PFRA calculator",
-    "Air Force fitness calculator",
-    "Air Force PT test",
-    "AFPT",
-    "USAF PT",
-    "Air Force fitness assessment",
-    "USAF FA test",
-    "PFRA scoring charts",
-    "AFSPECWAR fitness test",
-    "EOD fitness test",
-    "2-mile run score",
-    "HAMR shuttle score",
-  ];
 
   return (
     <div
@@ -855,7 +736,40 @@ export default function App() {
         .af-section-anchor { scroll-margin-top: 16px; }
       `}</style>
 
-      <main style={{ width: "100%", maxWidth: 1160, padding: mobileMode ? 12 : 16 }}>
+      {mobileMode && showMobileTicker && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 9998,
+            background: "rgba(4, 26, 58, 0.97)",
+            borderBottom: "1px solid rgba(255,255,255,0.12)",
+            boxShadow: "0 10px 24px rgba(0,0,0,0.30)",
+            padding: "10px 10px 8px",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div style={{ maxWidth: 1160, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 6 }}>
+            {[
+              { label: "WHtR", value: exemptWHtR ? "Exempt" : earnedWHtR.toFixed(1) },
+              { label: "Str", value: exemptStrength ? "Exempt" : earnedStrength.toFixed(1) },
+              { label: "Core", value: exemptCore ? "Exempt" : earnedCore.toFixed(1) },
+              { label: "Cardio", value: exemptCardio ? "Exempt" : earnedCardio.toFixed(1) },
+              { label: "Comp", value: total.toFixed(1) },
+            ].map((item) => (
+              <div key={item.label} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: "8px 6px", textAlign: "center" }}>
+                <div style={{ fontSize: 10.5, fontWeight: 900, color: faintText }}>{item.label}</div>
+                <div style={{ fontSize: 15, fontWeight: 950, lineHeight: 1.1 }}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <main style={{ width: "100%", maxWidth: 1160, padding: mobileMode ? (showMobileTicker ? 76 : 12) : 16 }}>
+
         <div
           style={{
             height: 4,
@@ -866,7 +780,7 @@ export default function App() {
         />
 
         <header ref={introRef} className="af-section-anchor" style={{ ...cardStyle, background: "rgba(0,0,0,0.18)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.2fr 0.8fr", gap: 14, alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: mobileMode ? "1fr" : "1.12fr 0.88fr", gap: 14, alignItems: "center" }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.15, color: "rgba(255,255,255,0.72)" }}>USAF FITNESS</div>
               <h1 style={{ margin: "6px 0 8px", fontSize: mobileMode ? 28 : 34, lineHeight: 1.06 }}>USAF PFRA Calculator</h1>
@@ -874,87 +788,24 @@ export default function App() {
                 Free Air Force fitness test calculator for PFRA scoring, AFSPECWAR/EOD standards, waist-to-height ratio,
                 push-ups, hand-release push-ups, sit-ups, reverse crunch, plank, 2-mile run, and HAMR scoring.
               </p>
-              <p style={{ margin: "10px 0 0", color: faintText, lineHeight: 1.55, fontSize: 13.5 }}>
-                Built to make it easier for Airmen and candidates to estimate component points quickly before checking official
-                charts and local guidance.
-              </p>
-
               <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(calculatorRef)}>
-                  Jump to calculator
-                </button>
                 <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(downloadsRef)}>
-                  View PDFs
-                </button>
-                <button className="af-btn af-btn--pill" type="button" onClick={() => setShowOverview((v) => !v)}>
-                  {showOverview ? "Hide overview" : "Show overview"}
+                  View Official Guidance
                 </button>
                 <button className="af-btn af-btn--pill" type="button" onClick={() => scrollToRef(supportRef)}>
-                  Support / feedback
+                  Support / Feedback
                 </button>
               </div>
             </div>
 
-            <aside style={{ ...cardStyle, padding: 12 }} aria-label="Quick facts">
-              <div style={{ fontSize: 11.5, fontWeight: 900, color: faintText }}>QUICK OVERVIEW</div>
-              <div style={{ marginTop: 8, display: "grid", gap: 8, fontSize: 13.5, color: subtleText }}>
-                <div>WHtR 20 + Strength 15 + Core 15 + Cardio 50 = 100</div>
-                <div>Program toggle for PFRA and AFSPECWAR / EOD</div>
-                <div>Prorated exemptions supported</div>
-                <div>Version {APP_VERSION} • Updated {APP_UPDATED}</div>
+            <aside style={{ ...cardStyle, padding: 12 }} aria-label="Version information">
+              <div style={{ display: "grid", gap: 8, fontSize: 13.5, color: subtleText }}>
+                <div>Version {APP_VERSION}</div>
+                <div>Updated {APP_UPDATED}</div>
               </div>
             </aside>
           </div>
-
-          <div style={{ position: "absolute", left: -9999, width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
-            {seoKeywords.join(", ")}
-          </div>
         </header>
-
-        {showStickyRibbon && (
-          <div
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              zIndex: 900,
-              padding: mobileMode ? "10px 10px 8px" : "10px 14px 8px",
-              background: "rgba(4, 26, 58, 0.96)",
-              borderBottom: "1px solid rgba(255,255,255,0.12)",
-              boxShadow: "0 12px 26px rgba(0,0,0,0.22)",
-              backdropFilter: "blur(8px)",
-            }}
-          >
-            <div style={{ width: "100%", maxWidth: 1160, margin: "0 auto" }}>
-              <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.8, color: "rgba(255,255,255,0.88)", marginBottom: 8 }}>
-                USAF PFRA Calculator
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: mobileMode ? "repeat(5, minmax(0, 1fr))" : "repeat(5, minmax(0, 1fr))",
-                  gap: 8,
-                }}
-              >
-                {[
-                  { label: "WHtR", value: earnedWHtR.toFixed(1), sub: componentPercent(earnedWHtR, maxWHtR) },
-                  { label: "Strength", value: earnedStrength.toFixed(1), sub: componentPercent(earnedStrength, maxStrength) },
-                  { label: "Core", value: earnedCore.toFixed(1), sub: componentPercent(earnedCore, maxCore) },
-                  { label: "Cardio", value: earnedCardio.toFixed(1), sub: componentPercent(earnedCardio, maxCardio) },
-                  { label: "Composite", value: total.toFixed(1), sub: compositeText },
-                ].map((item) => (
-                  <div key={item.label} style={{ borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.06)", padding: mobileMode ? "8px 6px" : "8px 10px" }}>
-                    <div style={{ fontSize: mobileMode ? 10 : 11, color: faintText, fontWeight: 900 }}>{item.label}</div>
-                    <div style={{ fontSize: mobileMode ? 18 : 22, lineHeight: 1.05, fontWeight: 950 }}>{item.value}</div>
-                    <div style={{ fontSize: mobileMode ? 10 : 11, color: faintText, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.sub}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
 
         {showDiagnostic && (
           <section style={{ marginTop: 12, ...cardStyle }} aria-label="Diagnostic notice">
@@ -1135,27 +986,12 @@ export default function App() {
                 </div>
                 <div style={{ marginTop: 10, fontSize: 13, color: subtleText }}>Points: <strong style={{ color: "#fff" }}>{earnedCardio.toFixed(1)}</strong></div>
               </section>
-
-              <section style={cardStyle} aria-labelledby="score-note-heading">
-                <div style={sectionTitleStyle}>
-                  <h3 id="score-note-heading" style={{ margin: 0, fontSize: 16 }}>Composite scoring</h3>
-                  <span style={sectionTagStyle}>Status</span>
-                </div>
-                <div style={{ display: "grid", gap: 8, color: subtleText, fontSize: 13.5, lineHeight: 1.55 }}>
-                  <div>Your composite score is prorated from the available components when exemptions are selected.</div>
-                  <div><strong style={{ color: "#fff" }}>Less than 75:</strong> Unsatisfactory</div>
-                  <div><strong style={{ color: "#fff" }}>75 to less than 90:</strong> Satisfactory</div>
-                  <div><strong style={{ color: "#fff" }}>90 or above:</strong> Excellent</div>
-                  <div style={{ fontSize: 11.5, color: faintText }}>Available max: <strong style={{ color: "#fff" }}>{availableMax.toFixed(0)}</strong> • Earned: <strong style={{ color: "#fff" }}>{earnedTotal.toFixed(1)}</strong></div>
-                </div>
-              </section>
             </div>
           </div>
 
           <section style={{ marginTop: 12, ...cardStyle }} aria-labelledby="exemptions-heading">
             <div style={sectionTitleStyle}>
               <h3 id="exemptions-heading" style={{ margin: 0, fontSize: 16 }}>Exemptions</h3>
-              <span style={sectionTagStyle}>Exemptions</span>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {[
@@ -1184,69 +1020,89 @@ export default function App() {
               ))}
             </div>
           </section>
-        </section>
 
-        <section style={{ marginTop: 12, display: "grid", gridTemplateColumns: gridCols, gap: 10 }} aria-label="Summary metrics">
-          <div style={kpiCardStyle}>
-            <div style={{ fontSize: 11.5, color: faintText, fontWeight: 850 }}>WHtR</div>
-            <div style={{ fontSize: 28, fontWeight: 950 }}>{earnedWHtR.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>{componentPercent(earnedWHtR, maxWHtR)} {exemptWHtR ? "• Exempt" : whtrData.rounded == null ? "" : `• Rounded ${whtrData.rounded.toFixed(2)}`}</div>
-          </div>
-          <div style={kpiCardStyle}>
-            <div style={{ fontSize: 11.5, color: faintText, fontWeight: 850 }}>STRENGTH</div>
-            <div style={{ fontSize: 28, fontWeight: 950 }}>{earnedStrength.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>{componentPercent(earnedStrength, maxStrength)} • {exemptStrength ? "Exempt" : strengthTest === "pushups" ? "Push-ups" : "HRPU"}</div>
-          </div>
-          <div style={kpiCardStyle}>
-            <div style={{ fontSize: 11.5, color: faintText, fontWeight: 850 }}>CORE</div>
-            <div style={{ fontSize: 28, fontWeight: 950 }}>{earnedCore.toFixed(1)}</div>
-            <div style={{ fontSize: 11, color: faintText }}>{componentPercent(earnedCore, maxCore)} • {exemptCore ? "Exempt" : coreTest === "situps" ? "Sit-ups" : coreTest === "reverse_crunch" ? "Reverse crunch" : "Plank"}</div>
-          </div>
-          <div style={{ ...kpiCardStyle, background: badge.bg, color: badge.fg }}>
-            <div style={{ fontSize: 11.5, color: badge.fg, opacity: 0.82, fontWeight: 850 }}>COMPOSITE</div>
-            <div style={{ fontSize: 28, fontWeight: 950 }}>{total.toFixed(1)}%</div>
-            <div style={{ fontSize: 12, fontWeight: 900 }}>{compositeText}</div>
-            <div style={{ fontSize: 11, color: badge.fg, opacity: 0.82 }}>{badge.label}</div>
-          </div>
-        </section>
-
-        <section style={{ marginTop: 12, ...cardStyle }} aria-labelledby="about-heading">
-          <div style={sectionTitleStyle}>
-            <h2 id="about-heading" style={{ margin: 0, fontSize: 20 }}>Overview</h2>
-            <button className="af-btn af-btn--sm" type="button" onClick={() => setShowOverview((v) => !v)}>
-              {showOverview ? "Hide" : "Show"}
-            </button>
-          </div>
-          {showOverview && (
-            <div style={{ display: "grid", gap: 10, color: subtleText, lineHeight: 1.6, fontSize: 14 }}>
-              <p style={{ margin: 0 }}>
-                This USAF PFRA Calculator is built to help users estimate Air Force fitness scores across waist-to-height ratio,
-                strength, core, cardio, and composite performance in one place. It is useful for people searching for an Air Force
-                PT test calculator, AFPT calculator, USAF PT calculator, Air Force fitness assessment calculator, or USAF FA test
-                score estimator.
-              </p>
-              <p style={{ margin: 0 }}>
-                The calculator supports waist-to-height ratio scoring, push-ups, hand-release push-ups, sit-ups, cross-leg reverse
-                crunch, plank, 2-mile run, and HAMR scoring. It also includes the AFSPECWAR / EOD universal chart so users can
-                quickly compare PFRA and special warfare style scoring on the same page.
-              </p>
-              <p style={{ margin: 0 }}>
-                Official reference downloads are included below so users can compare calculator output with the PFRA scoring charts,
-                DAFMAN guidance, and related Air Force fitness documents. This page is designed as a free, fast score estimator and
-                should always be cross-checked against current official guidance and local policy.
-              </p>
+          <section style={{ marginTop: 12 }} aria-labelledby="scores-heading">
+            <div style={sectionTitleStyle}>
+              <h3 id="scores-heading" style={{ margin: 0, fontSize: 18 }}>Current scores</h3>
             </div>
-          )}
+            <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 10 }}>
+              {[
+                {
+                  label: "WHtR",
+                  points: exemptWHtR ? "Exempt" : earnedWHtR.toFixed(1),
+                  pct: whtrPct,
+                  sub: exemptWHtR ? "Exempt" : whtrData.rounded == null ? "Enter height and waist" : `Rounded ${whtrData.rounded.toFixed(2)}`,
+                  band: whtrBand,
+                },
+                {
+                  label: "Strength",
+                  points: exemptStrength ? "Exempt" : earnedStrength.toFixed(1),
+                  pct: strengthPct,
+                  sub: exemptStrength ? "Exempt" : strengthTest === "pushups" ? "Push-ups" : "HRPU",
+                  band: strengthBand,
+                },
+                {
+                  label: "Core",
+                  points: exemptCore ? "Exempt" : earnedCore.toFixed(1),
+                  pct: corePct,
+                  sub: exemptCore ? "Exempt" : coreTest === "situps" ? "Sit-ups" : coreTest === "reverse_crunch" ? "Reverse crunch" : "Plank",
+                  band: coreBand,
+                },
+                {
+                  label: "Cardio",
+                  points: exemptCardio ? "Exempt" : earnedCardio.toFixed(1),
+                  pct: cardioPct,
+                  sub: exemptCardio ? "Exempt" : cardioTest === "2mile" ? "2-mile run" : "HAMR",
+                  band: cardioBand,
+                },
+              ].map((card) => (
+                <div
+                  key={card.label}
+                  style={{
+                    ...cardStyle,
+                    background: card.band ? card.band.bg : "rgba(255,255,255,0.04)",
+                    color: card.band ? card.band.fg : "#FFFFFF",
+                    border: `1px solid ${card.band ? card.band.border : "rgba(255,255,255,0.12)"}`,
+                    minHeight: 110,
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.5, opacity: 0.88 }}>{card.label}</div>
+                  <div style={{ marginTop: 8, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 28, fontWeight: 950, lineHeight: 1 }}>{card.points}</div>
+                    {card.pct != null ? <div style={{ fontSize: 15, fontWeight: 900 }}>{formatPct(card.pct)}</div> : null}
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 12.5, opacity: 0.92 }}>{card.sub}</div>
+                </div>
+              ))}
+
+              <div
+                style={{
+                  ...cardStyle,
+                  background: compositeBand.bg,
+                  color: compositeBand.fg,
+                  border: `1px solid ${compositeBand.border}`,
+                  minHeight: 110,
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.5, opacity: 0.88 }}>Composite</div>
+                <div style={{ marginTop: 8, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 30, fontWeight: 950, lineHeight: 1 }}>{total.toFixed(1)}</div>
+                  <div style={{ fontSize: 15, fontWeight: 900 }}>{formatPct(total)}</div>
+                </div>
+                <div style={{ marginTop: 10, fontSize: 17, fontWeight: 950 }}>{compositeText}</div>
+                <div style={{ marginTop: 6, fontSize: 12.5, opacity: 0.92 }}>Based on available components{availableMax < 100 ? ` • max ${availableMax.toFixed(0)}` : ""}</div>
+              </div>
+            </div>
+          </section>
         </section>
 
         <section ref={downloadsRef} className="af-section-anchor" style={{ marginTop: 12, ...cardStyle }} aria-labelledby="downloads-heading">
           <div style={sectionTitleStyle}>
-            <h2 id="downloads-heading" style={{ margin: 0, fontSize: 20 }}>Official reference downloads</h2>
+            <h2 id="downloads-heading" style={{ margin: 0, fontSize: 20 }}>Official guidance</h2>
             <span style={sectionTagStyle}>PDF</span>
           </div>
           <p style={{ marginTop: 0, marginBottom: 12, color: faintText, lineHeight: 1.55 }}>
-            These reference files help users confirm Air Force fitness scoring details and give search engines more context about
-            the page topic through clearly labeled resource links.
+            These reference files help users confirm scoring details against official source documents.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: isVeryNarrow ? "1fr" : isNarrow ? "1fr 1fr" : "repeat(3, minmax(220px, 1fr))", gap: 10 }}>
             {ATTACHMENTS.map((a) => (
@@ -1264,37 +1120,57 @@ export default function App() {
           </div>
         </section>
 
+        <section style={{ marginTop: 12, ...cardStyle }} aria-labelledby="about-heading">
+          <div style={sectionTitleStyle}>
+            <h2 id="about-heading" style={{ margin: 0, fontSize: 20 }}>Overview</h2>
+            <button className="af-btn af-btn--sm" type="button" onClick={() => setShowOverview((v) => !v)}>
+              {showOverview ? "Hide" : "Show"}
+            </button>
+          </div>
+          {showOverview && (
+            <div style={{ display: "grid", gap: 10, color: subtleText, lineHeight: 1.6, fontSize: 14 }}>
+              <p style={{ margin: 0 }}>
+                This USAF PFRA calculator is built to help Airmen, candidates, and anyone searching for an Air Force PT score
+                estimate quickly calculate waist-to-height ratio, strength, core, cardio, and composite performance in one place.
+                It supports standard PFRA scoring as well as the AFSPECWAR / EOD option.
+              </p>
+              <p style={{ margin: 0 }}>
+                The calculator supports waist-to-height ratio scoring, push-ups, hand-release push-ups, sit-ups, cross-leg reverse
+                crunch, plank, 2-mile run, and HAMR scoring. It is designed for users who may also search for an Air Force PT test,
+                AFPT, USAF PT, Air Force fitness assessment, or USAF FA test calculator.
+              </p>
+              <p style={{ margin: 0 }}>
+                Official guidance links are included above so results can be compared directly with the source documents.
+              </p>
+            </div>
+          )}
+        </section>
+
         <section ref={supportRef} className="af-section-anchor" style={{ marginTop: 12, ...cardStyle }} aria-labelledby="support-heading">
           <div style={sectionTitleStyle}>
             <h2 id="support-heading" style={{ margin: 0, fontSize: 20 }}>Feedback and support</h2>
-            <span style={sectionTagStyle}>Contact</span>
           </div>
-          <div style={{ display: "grid", gap: 12, color: subtleText, lineHeight: 1.55 }}>
-            <p style={{ margin: 0 }}>
-              This calculator took substantial time to build, test, refine, and maintain. The goal is to keep it free for Airmen,
-              candidates, and anyone who needs a quick PFRA estimate. Feedback, questions, and support are always appreciated.
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              <a className="af-btn" href="mailto:jeffnmore@hotmail.com?subject=PFRA%20Calculator%20Feedback">Send feedback</a>
-              <button className="af-btn" type="button" onClick={() => setShowSupport((v) => !v)}>{showSupport ? "Hide support options" : "Buy me a coffee / beer"}</button>
-            </div>
-            {showSupport && (
-              <div style={{ display: "grid", gridTemplateColumns: isVeryNarrow ? "1fr" : "1fr 1fr", gap: 12 }}>
-                <div style={{ ...cardStyle, padding: 12 }}>
-                  <div style={{ fontWeight: 900, marginBottom: 10 }}>Cash App</div>
-                  <div style={{ display: "grid", placeItems: "center" }}>
-                    <SmartQrImage candidates={cashAppQrCandidates} alt="Cash App QR code" boxSize={isVeryNarrow ? 220 : 188} />
-                  </div>
-                </div>
-                <div style={{ ...cardStyle, padding: 12 }}>
-                  <div style={{ fontWeight: 900, marginBottom: 10 }}>Venmo</div>
-                  <div style={{ display: "grid", placeItems: "center" }}>
-                    <SmartQrImage candidates={venmoQrCandidates} alt="Venmo QR code" boxSize={isVeryNarrow ? 220 : 188} />
-                  </div>
-                </div>
+          <p style={{ marginTop: 0, color: subtleText, lineHeight: 1.6 }}>
+            This calculator took significant time to build, test, and maintain. The goal is to keep it free and useful. If it
+            helped you, feedback and support are appreciated.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <a className="af-btn" href="mailto:jeffnmore@hotmail.com?subject=PFRA%20Calculator%20Feedback">Feedback</a>
+            <button className="af-btn" type="button" onClick={() => setShowSupport((v) => !v)}>Buy me a coffee</button>
+            <button className="af-btn" type="button" onClick={() => setShowSupport((v) => !v)}>Buy me a beer</button>
+          </div>
+
+          {showSupport && (
+            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+              <div style={{ color: faintText, fontSize: 13.5 }}>
+                Choose a payment option below. Replace the Cash App cashtag link in the code if needed.
               </div>
-            )}
-          </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                <a className="af-btn" href={VENMO_URL} target="_blank" rel="noreferrer">Venmo</a>
+                <a className="af-btn" href={CASH_APP_URL} target="_blank" rel="noreferrer">Cash App</a>
+              </div>
+            </div>
+          )}
         </section>
 
         <footer style={{ marginTop: 14, paddingTop: 10, textAlign: "center" }}>
@@ -1302,7 +1178,7 @@ export default function App() {
             <img src="/branding/usaf_wings_transparent_refined.png" alt="U.S. Air Force wings graphic" style={{ height: 34, width: "auto", opacity: 0.95 }} />
             <img src="/branding/us_air_force_text_transparent.png" alt="U.S. Air Force text logo" style={{ height: 15, width: "auto", opacity: 0.9 }} />
           </div>
-          <div style={{ marginTop: 8, fontSize: 11.5, color: "rgba(255,255,255,0.60)" }}>PFRA Calculator</div>
+          <div style={{ marginTop: 8, fontSize: 11.5, color: "rgba(255,255,255,0.60)" }}>PFRA Calculator • Powered by Fingers</div>
           <div style={{ marginTop: 6, fontSize: 10.8, color: "rgba(255,255,255,0.60)", lineHeight: 1.45 }}>
             Always verify scoring, exemptions, and program requirements against current official guidance and local unit policy.
           </div>
