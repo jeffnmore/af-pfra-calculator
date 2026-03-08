@@ -416,11 +416,30 @@ export default function App() {
   }
 
   useEffect(() => {
-    const onScroll = () => setShowMobileTicker((window.scrollY || window.pageYOffset || 0) > 20);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    if (!mobileMode) {
+      setShowMobileTicker(false);
+      return;
+    }
+
+    const updateTickerVisibility = () => {
+      const y = Math.max(window.scrollY || 0, window.pageYOffset || 0, document.documentElement.scrollTop || 0);
+      setShowMobileTicker((prev) => {
+        if (y <= 2) return false;
+        return prev || y > 24;
+      });
+    };
+
+    updateTickerVisibility();
+    window.addEventListener("scroll", updateTickerVisibility, { passive: true });
+    window.addEventListener("resize", updateTickerVisibility);
+    window.addEventListener("focusin", updateTickerVisibility);
+
+    return () => {
+      window.removeEventListener("scroll", updateTickerVisibility);
+      window.removeEventListener("resize", updateTickerVisibility);
+      window.removeEventListener("focusin", updateTickerVisibility);
+    };
+  }, [mobileMode]);
 
   const ageBand = useMemo(() => {
     const a = parseNumber(age);
@@ -549,7 +568,7 @@ export default function App() {
   const coreBand = corePct == null ? null : performanceBand(corePct);
   const cardioBand = cardioPct == null ? null : performanceBand(cardioPct);
   const compositeBand = performanceBand(total);
-  const CASH_APP_URL = "https://cash.app/$FingersHMAN";
+  const CASH_APP_URL = "https://cash.app/$YourCashtag";
   const VENMO_URL = "https://account.venmo.com/u/Fingers-HMAN";
 
   useEffect(() => {
@@ -747,8 +766,9 @@ export default function App() {
             background: "rgba(4, 26, 58, 0.97)",
             borderBottom: "1px solid rgba(255,255,255,0.12)",
             boxShadow: "0 10px 24px rgba(0,0,0,0.30)",
-            padding: "10px 10px 8px",
+            padding: "calc(env(safe-area-inset-top, 0px) + 10px) 10px 8px",
             backdropFilter: "blur(8px)",
+            boxSizing: "border-box",
           }}
         >
           <div style={{ maxWidth: 1160, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 6 }}>
@@ -768,7 +788,18 @@ export default function App() {
         </div>
       )}
 
-      <main style={{ width: "100%", maxWidth: 1160, padding: mobileMode ? (showMobileTicker ? 76 : 12) : 16 }}>
+      <main
+        style={{
+          width: "100%",
+          maxWidth: 1160,
+          margin: "0 auto",
+          paddingTop: mobileMode ? (showMobileTicker ? 76 : 12) : 16,
+          paddingRight: mobileMode ? 12 : 16,
+          paddingBottom: mobileMode ? 12 : 16,
+          paddingLeft: mobileMode ? 12 : 16,
+          boxSizing: "border-box",
+        }}
+      >
 
         <div
           style={{
