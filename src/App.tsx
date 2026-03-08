@@ -293,6 +293,9 @@ export default function App() {
   const [exemptCore, setExemptCore] = useState(false);
   const [exemptCardio, setExemptCardio] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showDonateModal, setShowDonateModal] = useState(false);
+  const [donateLabel, setDonateLabel] = useState<"Coffee" | "Beer">("Coffee");
+  const [viewportTop, setViewportTop] = useState(0);
 
   const [vw, setVw] = useState<number>(() => (typeof window !== "undefined" ? window.innerWidth : 1200));
   const [mobileMode, setMobileMode] = useState<boolean>(() => (typeof window !== "undefined" ? window.innerWidth < 680 : false));
@@ -306,6 +309,29 @@ export default function App() {
   useEffect(() => {
     if (vw < 680) setMobileMode(true);
   }, [vw]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const updateViewportTop = () => {
+      setViewportTop(vv.offsetTop || 0);
+    };
+
+    updateViewportTop();
+    vv.addEventListener("resize", updateViewportTop);
+    vv.addEventListener("scroll", updateViewportTop);
+    window.addEventListener("focusin", updateViewportTop);
+    window.addEventListener("focusout", updateViewportTop);
+
+    return () => {
+      vv.removeEventListener("resize", updateViewportTop);
+      vv.removeEventListener("scroll", updateViewportTop);
+      window.removeEventListener("focusin", updateViewportTop);
+      window.removeEventListener("focusout", updateViewportTop);
+    };
+  }, []);
 
   const officialRef = useRef<HTMLElement | null>(null);
   const supportRef = useRef<HTMLElement | null>(null);
@@ -521,6 +547,7 @@ export default function App() {
       <style>{`
         * { box-sizing: border-box; }
         html, body, #root { width: 100%; max-width: 100%; overflow-x: hidden; }
+        body { margin: 0; }
         .af-btn {
           display: inline-flex;
           align-items: center;
@@ -546,20 +573,24 @@ export default function App() {
         <div
           style={{
             position: "fixed",
-            top: 0,
+            top: viewportTop,
             left: 0,
             right: 0,
+            width: "100vw",
+            maxWidth: "100vw",
             zIndex: 9999,
             background: "rgba(4,26,58,0.97)",
             borderBottom: "1px solid rgba(255,255,255,0.10)",
             boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
+            transform: "translateZ(0)",
+            WebkitTransform: "translateZ(0)",
           }}
         >
           <div
             style={{
               maxWidth: 1160,
               margin: "0 auto",
-              padding: "8px 12px 10px",
+              padding: "calc(env(safe-area-inset-top, 0px) + 8px) 12px 10px",
               display: "grid",
               gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
               gap: 6,
@@ -884,14 +915,16 @@ export default function App() {
               window.location.href = "mailto:jeffnmore@hotmail.com?subject=PFRA%20Calculator%20Feedback";
             })}
             {supportButton("Buy Me a Coffee", () => {
-              window.open(CASH_APP_URL, "_blank", "noopener,noreferrer");
+              setDonateLabel("Coffee");
+              setShowDonateModal(true);
             })}
             {supportButton("Buy Me a Beer", () => {
-              window.open(VENMO_URL, "_blank", "noopener,noreferrer");
+              setDonateLabel("Beer");
+              setShowDonateModal(true);
             })}
           </div>
           <div style={{ marginTop: 10, fontSize: 11.5, color: faintText }}>
-            Cash App button uses the cashtag link in <code style={{ color: "#fff" }}>CASH_APP_URL</code>. Replace the placeholder with your real Cash App cashtag if needed.
+            Choose Venmo or Cash App after tapping either support button. Update the Cash App button by replacing <code style={{ color: "#fff" }}>YourCashtag</code> in <code style={{ color: "#fff" }}>CASH_APP_URL</code>.
           </div>
         </section>
 
@@ -919,6 +952,77 @@ export default function App() {
             </div>
           ) : null}
         </section>
+        {showDonateModal ? (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Choose payment method for ${donateLabel}`}
+            onClick={() => setShowDonateModal(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 10001,
+              background: "rgba(0,0,0,0.58)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 16,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: 420,
+                borderRadius: 18,
+                border: "1px solid rgba(255,255,255,0.14)",
+                background: "linear-gradient(180deg, rgba(7,27,58,0.98) 0%, rgba(4,19,42,0.98) 100%)",
+                boxShadow: "0 18px 40px rgba(0,0,0,0.38)",
+                padding: 18,
+                display: "grid",
+                gap: 14,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: faintText, fontWeight: 900, letterSpacing: 0.7 }}>SUPPORT</div>
+                  <div style={{ fontSize: 22, fontWeight: 950 }}>Buy Me a {donateLabel}</div>
+                </div>
+                <button className="af-btn" type="button" onClick={() => setShowDonateModal(false)}>
+                  Close
+                </button>
+              </div>
+
+              <div style={{ color: subtleText, lineHeight: 1.55, fontSize: 14 }}>
+                Choose a payment method below. On mobile, each button should open the selected service directly.
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <button
+                  className="af-btn"
+                  type="button"
+                  onClick={() => window.open(VENMO_URL, "_blank", "noopener,noreferrer")}
+                  style={{ minHeight: 54 }}
+                >
+                  Venmo
+                </button>
+                <button
+                  className="af-btn"
+                  type="button"
+                  onClick={() => window.open(CASH_APP_URL, "_blank", "noopener,noreferrer")}
+                  style={{ minHeight: 54 }}
+                >
+                  Cash App
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gap: 6, fontSize: 12, color: faintText }}>
+                <div>Venmo opens your profile page: <span style={{ color: "#fff" }}>Fingers-HMAN</span></div>
+                <div>Cash App opens your cashtag link. Replace the placeholder cashtag before deploying.</div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   );
