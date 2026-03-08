@@ -908,7 +908,7 @@ export default function App() {
           </div>
           <p style={{ marginTop: 0, color: subtleText, lineHeight: 1.6 }}>
             This calculator took substantial time to build, test, and maintain. The goal is to keep it free for users.
-            If it helped you, you can send feedback or support future updates below.
+            If it helped you, you can send feedback or support future updates below. I will do my best to enjoy every cup of coffee or beer sent my way, and I appreciate your support!
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {supportButton("Send Feedback", () => {
@@ -924,7 +924,7 @@ export default function App() {
             })}
           </div>
           <div style={{ marginTop: 10, fontSize: 11.5, color: faintText }}>
-            Choose Venmo or Cash App after tapping either support button. Update the Cash App button by replacing <code style={{ color: "#fff" }}>YourCashtag</code> in <code style={{ color: "#fff" }}>CASH_APP_URL</code>.
+            Choose Venmo or Cash App after tapping either support button. 
           </div>
         </section>
 
